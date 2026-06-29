@@ -527,6 +527,16 @@
       </div>
     </div>
     <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">🔔 แจ้งเตือนออเดอร์ใหม่</h3>
+      <p class="hint">เล่นเสียง "ติ๊ง ติ๊ง" เมื่อมีออเดอร์ใหม่จากลูกค้าเข้ามา</p>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer">
+        <input type="checkbox" id="notifySoundChk" onchange="toggleNotifySound()" style="width:18px; height:18px" />
+        <span>เปิดเสียงแจ้งเตือน</span>
+      </label>
+      <button class="btn ghost" onclick="testOrderSound()" style="margin-top:8px">🔊 ทดสอบเสียง</button>
+      <p class="hint" style="margin-top:6px">หมายเหตุ: เบราว์เซอร์ต้องให้กดอะไรในหน้าก่อน 1 ครั้ง เสียงถึงจะเล่นได้</p>
+    </div>
+    <div class="card" style="margin-top:10px">
       <h3 style="margin:0 0 8px">QR สำหรับลูกค้า</h3>
       <p class="hint">สร้าง QR เพื่อให้ลูกค้าสแกนเปิดเมนู (เชื่อม Firebase แล้วใช้ข้ามเครื่องได้)</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
@@ -743,6 +753,48 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ====== NOTIFICATION SOUND ======
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) { return null; }
+  }
+  if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(()=>{});
+  return _audioCtx;
+}
+// Unlock audio context on first user gesture (browsers require this)
+['click','touchstart','keydown'].forEach(ev => {
+  document.addEventListener(ev, () => { getAudioCtx(); }, { once: true, passive: true });
+});
+function playOrderSound(force) {
+  if (!force && state.notifySound === false) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  // Two ascending beeps: A5 → E6
+  const tones = [{ f: 880, t: 0 }, { f: 1320, t: 0.16 }];
+  tones.forEach(({ f, t }) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    const start = ctx.currentTime + t;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.18);
+  });
+}
+function testOrderSound() { playOrderSound(true); }
+function toggleNotifySound() {
+  state.notifySound = document.getElementById('notifySoundChk').checked;
+  save();
+  if (state.notifySound) playOrderSound(true);
 }
 
 // ====== SWEETNESS & DRINK HELPERS ======
@@ -2209,6 +2261,26 @@ function fbEnsureAuth() {
   if (auth.currentUser) return Promise.resolve(auth.currentUser);
   return auth.signInAnonymously().then(cred => cred.user);
 }
+// Try to claim ownership of a shopId. If claimed by another UID and allowRetry,
+// auto-regenerate a new shopId and try once more (recovery flow).
+function fbTryClaimShop(user, shopId, allowRetry) {
+  const ownerRef = fbDb.ref(`shops/${shopId}/_ownerUid`);
+  return ownerRef.once('value').then(snap => {
+    const existing = snap.val();
+    if (!existing) {
+      return ownerRef.set(user.uid).then(() => ({ user, shopId, claimed: true, regenerated: !allowRetry }));
+    }
+    if (existing !== user.uid) {
+      if (allowRetry) {
+        const newId = 'shop' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem(FB_SHOPID_KEY, newId);
+        return fbTryClaimShop(user, newId, false).then(r => ({ ...r, regenerated: true }));
+      }
+      throw new Error('ร้านนี้ถูกผูกกับเครื่องอื่นแล้ว — ลองล้าง localStorage แล้วเชื่อมใหม่');
+    }
+    return { user, shopId, claimed: false, regenerated: false };
+  });
+}
 
 function connectFirebase() {
   const apiKey = document.getElementById('fbApiKey').value.trim();
@@ -2220,26 +2292,15 @@ function connectFirebase() {
     const shopId = fbGetShopId();
     setFbStatus('🔐 กำลังยืนยันตัวตน...', true);
     fbEnsureAuth()
-      .then(user => {
-        // Claim ownership if not yet claimed
-        const ownerRef = fbDb.ref(`shops/${shopId}/_ownerUid`);
-        return ownerRef.once('value').then(snap => {
-          const existing = snap.val();
-          if (!existing) {
-            return ownerRef.set(user.uid).then(() => ({ user, claimed: true }));
-          }
-          if (existing !== user.uid) {
-            throw new Error('ร้านนี้ถูกผูกกับเครื่องอื่นแล้ว ใช้ Shop ID อื่นหรือล้าง _ownerUid ใน Firebase Console');
-          }
-          return { user, claimed: false };
-        });
+      .then(user => fbTryClaimShop(user, shopId, /*allowRetry=*/true))
+      .then(result => {
+        return fbDb.ref(`shops/${result.shopId}/_meta`).set({ shopName: state.shopName || '', updatedAt: Date.now() })
+          .then(() => result);
       })
-      .then(({ user, claimed }) => {
-        return fbDb.ref(`shops/${shopId}/_meta`).set({ shopName: state.shopName || '', updatedAt: Date.now() })
-          .then(() => ({ user, claimed }));
-      })
-      .then(({ user, claimed }) => {
-        setFbStatus(`✅ เชื่อมต่อแล้ว — Shop ID: <code>${shopId}</code><br><small>UID: <code>${user.uid.slice(0,12)}…</code>${claimed?' (ผูกร้านนี้แล้ว)':''}</small>`, true);
+      .then(({ user, shopId: claimedId, claimed, regenerated }) => {
+        const note = claimed ? ' (ผูกร้านนี้แล้ว)' : '';
+        const regNote = regenerated ? '<br><small style="color:#b45309">ℹ️ Shop ID เดิมถูกใช้แล้ว ระบบสร้าง ID ใหม่ให้</small>' : '';
+        setFbStatus(`✅ เชื่อมต่อแล้ว — Shop ID: <code>${claimedId}</code><br><small>UID: <code>${user.uid.slice(0,12)}…</code>${note}</small>${regNote}`, true);
         fbStartSync();
         toast('เชื่อมต่อ Firebase สำเร็จ');
       })
@@ -2278,6 +2339,7 @@ function fbStartSync() {
       if (!isCustomerView) {
         renderDashboard();
         if (activeTab === 'pos') renderPOS();
+        playOrderSound();
       }
       toast('🔔 มีออเดอร์ใหม่จากลูกค้า');
     });
@@ -2343,6 +2405,9 @@ function renderAll() {
   if (isCustomerView) { setupCustomerView(); return; }
   document.getElementById('shopName').value = state.shopName || '';
   document.getElementById('appTitle').textContent = '🍜 ' + (state.shopName || 'ระบบจัดการสต็อก');
+  // Notification sound toggle (default ON if undefined)
+  const chk = document.getElementById('notifySoundChk');
+  if (chk) chk.checked = state.notifySound !== false;
   renderMaterials();
   renderMenus();
   renderDashboard();
@@ -2362,8 +2427,17 @@ if (!isCustomerView && !state.menus.length && !state.materials.length) {
 // Re-sync when other tabs save (so customer-view tab on same device updates owner POS)
 window.addEventListener('storage', e => {
   if (e.key === STORAGE_KEY) {
+    const prevPendingCount = state.pendingOrders.length;
     load();
-    if (!isCustomerView) { renderDashboard(); if (activeTab==='pos') renderPOS(); }
+    const newOrderArrived = state.pendingOrders.length > prevPendingCount;
+    if (!isCustomerView) {
+      renderDashboard();
+      if (activeTab === 'pos') renderPOS();
+      if (newOrderArrived) {
+        playOrderSound();
+        toast('🔔 มีออเดอร์ใหม่จากลูกค้า');
+      }
+    }
   }
 });
 
