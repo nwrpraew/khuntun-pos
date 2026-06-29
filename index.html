@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ระบบจัดการสต็อก & คำนวณต้นทุน</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+  :root {
+    --primary: #ea580c;
+    --primary-dark: #c2410c;
+    --bg: #fff7ed;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #f59e0b;
+    --info: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Sukhumvit Set", "Noto Sans Thai", "Segoe UI", Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 14px 20px;
+    position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: 0.9; }
+
+  nav {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    overflow-x: auto;
+    position: sticky; top: 60px; z-index: 40;
+    -webkit-overflow-scrolling: touch;
+  }
+  nav button {
+    flex: 1 0 auto;
+    min-width: 80px;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  nav button.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: #fff7ed;
+  }
+  nav button:hover:not(.active) { background: #f9fafb; }
+
+  main { padding: 14px; max-width: 1200px; margin: 0 auto; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .toolbar input[type="search"], .toolbar select {
+    flex: 1;
+    min-width: 160px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  button.btn {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button.btn:hover { background: var(--primary-dark); }
+  button.btn.secondary { background: #6b7280; }
+  button.btn.secondary:hover { background: #4b5563; }
+  button.btn.danger { background: var(--danger); }
+  button.btn.success { background: var(--success); }
+  button.btn.small { padding: 6px 10px; font-size: 12px; }
+  button.btn.ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+  button.btn.block { width: 100%; padding: 13px; font-size: 15px; }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .card .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .card .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .card.low { border-color: var(--danger); background: #fef2f2; }
+  .card .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.ok { background: #dcfce7; color: var(--success); }
+  .badge.low { background: #fee2e2; color: var(--danger); }
+  .badge.warn { background: #fef3c7; color: #b45309; }
+  .badge.info { background: #dbeafe; color: var(--info); }
+
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 100;
+    padding: 14px;
+    overflow-y: auto;
+  }
+  .modal-bg.active { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    padding: 18px;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 4vh;
+  }
+  .modal h2 { margin: 0 0 14px; font-size: 17px; }
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: white;
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+  }
+  .stat .label { font-size: 12px; color: var(--muted); }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .stat .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .recipe-item {
+    display: grid;
+    grid-template-columns: 1fr 90px 70px 36px;
+    gap: 6px;
+    margin-bottom: 6px;
+    align-items: center;
+  }
+  .recipe-item .unit-label { font-size: 12px; color: var(--muted); text-align: center; }
+
+  .empty { text-align: center; padding: 30px 20px; color: var(--muted); font-size: 14px; }
+
+  /* POS */
+  .pos-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 14px;
+  }
+  @media (max-width: 800px) { .pos-layout { grid-template-columns: 1fr; } }
+  .pos-menus {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .menu-btn {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.1s;
+  }
+  .menu-btn:hover { border-color: var(--primary); background: #fff7ed; }
+  .menu-btn:active { transform: scale(0.97); }
+  .menu-btn .name { font-size: 13px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
+  .menu-btn .price { font-size: 14px; color: var(--primary); font-weight: 700; }
+  .menu-btn .cat { font-size: 10px; color: var(--muted); }
+
+  .cart {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 14px;
+    position: sticky; top: 120px;
+    max-height: calc(100vh - 140px);
+    display: flex; flex-direction: column;
+  }
+  .cart h3 { margin: 0 0 10px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .cart-items { flex: 1; overflow-y: auto; margin: 0 -4px 10px; padding: 0 4px; }
+  .cart-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    align-items: center;
+    font-size: 13px;
+  }
+  .qty-ctl { display: flex; align-items: center; gap: 4px; }
+  .qty-ctl button {
+    width: 26px; height: 26px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+  }
+  .qty-ctl span { min-width: 22px; text-align: center; font-weight: 600; }
+  .cart-total {
+    background: #fff7ed;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .cart-total .row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+  .cart-total .row.big { font-size: 16px; font-weight: 700; padding-top: 6px; border-top: 1px dashed #e5e7eb; margin-top: 4px; }
+
+  /* QR */
+  .qr-box {
+    background: white; padding: 16px; border-radius: 12px; text-align: center;
+  }
+  .qr-box canvas, .qr-box img { max-width: 280px; height: auto; }
+  #scanner-video { width: 100%; max-height: 60vh; background: black; border-radius: 8px; display: block; }
+  #scanner-canvas { display: none; }
+
+  /* Report */
+  .report-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .report-controls button {
+    padding: 8px 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .report-controls button.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .bar-chart { display: flex; align-items: flex-end; height: 160px; gap: 8px; padding: 8px 0; }
+  .bar-chart .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar-chart .bar {
+    width: 100%; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 2px;
+    transition: height 0.3s;
+  }
+  .bar-chart .bar-label { font-size: 10px; color: var(--muted); }
+  .bar-chart .bar-value { font-size: 10px; font-weight: 600; }
+
+  table.simple { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.simple th, table.simple td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  table.simple th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  table.simple td.num { text-align: right; }
+  table.simple .actions-cell { white-space: nowrap; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 16px; }
+    nav { top: 58px; }
+    nav button { padding: 10px 8px; font-size: 12px; min-width: 70px; }
+    .field-row { grid-template-columns: 1fr; }
+    .recipe-item { grid-template-columns: 1fr 70px 56px 32px; font-size: 12px; }
+    .stat .value { font-size: 16px; }
+    .cart { position: static; max-height: none; }
+    .pos-menus { grid-template-columns: repeat(2, 1fr); }
+    table.simple { font-size: 11px; }
+    table.simple th, table.simple td { padding: 6px 4px; }
+  }
+
+  .section-title { font-size: 14px; font-weight: 700; margin: 14px 0 8px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Customer view */
+  body.customer-view header { background: linear-gradient(135deg, #16a34a, #15803d); }
+  body.customer-view nav, body.customer-view #cust-banner { display: none; }
+  body.customer-view .owner-only { display: none !important; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1f2937; color: white;
+    padding: 12px 20px; border-radius: 8px;
+    font-size: 14px; z-index: 200;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    opacity: 0; transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="appTitle">🍜 ระบบจัดการสต็อก &amp; คำนวณต้นทุน</h1>
+  <p id="appSubtitle">สำหรับร้านอาหารและเครื่องดื่ม</p>
+</header>
+
+<nav id="mainNav">
+  <button data-tab="dashboard" class="active">📊 สรุป</button>
+  <button data-tab="pos">🛒 ขาย/POS</button>
+  <button data-tab="reports">📈 รายงาน</button>
+  <button data-tab="materials">📦 วัตถุดิบ</button>
+  <button data-tab="menus">🍽️ เมนู</button>
+  <button data-tab="calc">🧮 คำนวณ</button>
+  <button data-tab="settings">⚙️ ตั้งค่า</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section class="tab active" id="tab-dashboard">
+    <div class="summary-grid" id="statGrid"></div>
+    <div id="pendingAlert"></div>
+    <h3 class="section-title">⚠️ วัตถุดิบใกล้หมด</h3>
+    <div id="lowStockList" class="grid"></div>
+    <h3 class="section-title">🔥 เมนูขายดีวันนี้</h3>
+    <div id="topMenuList" class="grid"></div>
+  </section>
+
+  <!-- POS -->
+  <section class="tab" id="tab-pos">
+    <div class="toolbar">
+      <input type="search" id="posSearch" placeholder="ค้นหาเมนู..." />
+      <select id="posCategoryFilter"><option value="">ทุกหมวด</option></select>
+      <button class="btn ghost" onclick="openScanner()">📷 สแกน QR</button>
+      <button class="btn ghost" onclick="openCustomerQR()">📱 QR ลูกค้า</button>
+    </div>
+    <div id="pendingOrdersBox"></div>
+    <div class="pos-layout">
+      <div class="pos-menus" id="posMenuGrid"></div>
+      <div>
+        <div class="cart">
+          <h3>🧾 ออเดอร์ <span class="badge info" id="cartCount">0</span></h3>
+          <div class="cart-items" id="cartItems">
+            <div class="empty" style="padding:20px 10px">— ยังไม่มีรายการ —</div>
+          </div>
+          <div class="cart-total" id="cartTotal" style="display:none">
+            <div class="row"><span>ราคารวม</span><b id="cartSubtotal">0.00 ฿</b></div>
+            <div class="row"><span>ต้นทุน</span><b id="cartCost">0.00 ฿</b></div>
+            <div class="row" style="color:var(--success)"><span>กำไร</span><b id="cartProfit">0.00 ฿</b></div>
+            <div class="row big"><span>รวมเรียกเก็บ</span><b id="cartFinal">0.00 ฿</b></div>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <input type="text" id="cartNote" placeholder="หมายเหตุ เช่น โต๊ะ 5" />
+          </div>
+          <button class="btn block success" onclick="confirmOrder()" id="confirmBtn" disabled>✓ ยืนยันออเดอร์</button>
+          <button class="btn block secondary" onclick="clearCart()" style="margin-top:6px; padding:8px; font-size:13px">ล้างตะกร้า</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section class="tab" id="tab-reports">
+    <div class="report-controls">
+      <button data-range="today" class="active" onclick="setReportRange('today')">วันนี้</button>
+      <button data-range="yesterday" onclick="setReportRange('yesterday')">เมื่อวาน</button>
+      <button data-range="7d" onclick="setReportRange('7d')">7 วัน</button>
+      <button data-range="30d" onclick="setReportRange('30d')">30 วัน</button>
+      <button data-range="all" onclick="setReportRange('all')">ทั้งหมด</button>
+    </div>
+    <div class="summary-grid" id="reportStats"></div>
+    <div class="card">
+      <h3 style="margin:0 0 8px">📊 ยอดขาย 7 วันล่าสุด</h3>
+      <div class="bar-chart" id="weekChart"></div>
+    </div>
+    <h3 class="section-title">🏆 เมนูขายดี</h3>
+    <div class="card" id="topSellersBox"></div>
+    <h3 class="section-title">📋 ประวัติออเดอร์</h3>
+    <div class="card" style="overflow-x:auto">
+      <table class="simple" id="ordersTable">
+        <thead><tr><th>เวลา</th><th>รายการ</th><th class="num">รวม</th><th class="num">กำไร</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- MATERIALS -->
+  <section class="tab" id="tab-materials">
+    <div class="toolbar">
+      <input type="search" id="searchMat" placeholder="ค้นหาวัตถุดิบ..." />
+      <button class="btn" onclick="openMaterialModal()">+ เพิ่มวัตถุดิบ</button>
+    </div>
+    <div class="grid" id="materialList"></div>
+  </section>
+
+  <!-- MENUS -->
+  <section class="tab" id="tab-menus">
+    <div class="toolbar">
+      <input type="search" id="searchMenu" placeholder="ค้นหาเมนู..." />
+      <button class="btn" onclick="openMenuModal()">+ เพิ่มเมนู</button>
+    </div>
+    <div class="grid" id="menuList"></div>
+  </section>
+
+  <!-- CALC -->
+  <section class="tab" id="tab-calc">
+    <div class="card">
+      <h3 style="margin:0 0 8px">คำนวณต้นทุน-จุดคุ้มทุน</h3>
+      <div class="field">
+        <label>เลือกเมนู</label>
+        <select id="calcMenuSelect" onchange="renderCalc()"><option value="">-- เลือก --</option></select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>ค่าใช้จ่ายคงที่/วัน (฿)</label>
+          <input type="number" id="fixedCost" value="1000" min="0" oninput="renderCalc()" />
+        </div>
+        <div class="field">
+          <label>เป้าหมายขาย/วัน</label>
+          <input type="number" id="qtyPerDay" value="50" min="1" oninput="renderCalc()" />
+        </div>
+      </div>
+    </div>
+    <div id="calcResult"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="tab" id="tab-settings">
+    <div class="card">
+      <h3 style="margin:0 0 8px">ชื่อร้าน</h3>
+      <div class="field">
+        <input type="text" id="shopName" placeholder="ชื่อร้าน" oninput="saveShopName()" />
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">QR สำหรับลูกค้า</h3>
+      <p class="hint">สร้าง QR เพื่อให้ลูกค้าสแกนเปิดเมนู (ต้องการให้ไฟล์ HTML อยู่บน server หรือบนเดียวกัน)</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+        <button class="btn" onclick="openCustomerQR()">📱 แสดง QR ลูกค้า</button>
+        <button class="btn ghost" onclick="previewCustomerView()">👁️ ดูตัวอย่าง (ทดสอบ)</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">การจัดการข้อมูล</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+        <button class="btn secondary" onclick="exportData()">📥 ส่งออก JSON</button>
+        <button class="btn secondary" onclick="document.getElementById('importFile').click()">📤 นำเข้า</button>
+        <button class="btn ghost" onclick="loadKhunTun()">🐻 โหลดเมนูคุณตุ่น</button>
+        <button class="btn danger" onclick="resetAll()">🗑️ ล้างข้อมูล</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
+    </div>
+    <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">วิธีใช้งาน</h3>
+      <ol style="padding-left:18px; font-size:13px; line-height:1.8; margin:0">
+        <li>เพิ่ม <b>วัตถุดิบ</b> + <b>เมนู</b> (พร้อมสูตร)</li>
+        <li>ใช้แท็บ <b>ขาย/POS</b> แตะเมนูสร้างออเดอร์ หรือสแกน QR ลูกค้า</li>
+        <li>ยืนยันออเดอร์ → ระบบหักสต็อกอัตโนมัติ</li>
+        <li>ดู <b>รายงาน</b> ยอดขาย/กำไรรายวัน + กราฟ 7 วัน</li>
+        <li>ใช้ "QR ลูกค้า" ให้ลูกค้าสั่งเอง → ออเดอร์เข้าคิวรอยืนยัน</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<!-- Customer cart banner -->
+<div id="cust-banner"></div>
+
+<!-- Modals -->
+<div class="modal-bg" id="materialModal">
+  <div class="modal">
+    <h2 id="matModalTitle">เพิ่มวัตถุดิบ</h2>
+    <div class="field"><label>ชื่อวัตถุดิบ *</label><input type="text" id="matName" /></div>
+    <div class="field-row">
+      <div class="field"><label>หน่วย *</label><input type="text" id="matUnit" placeholder="กก., ลิตร, ชิ้น" /></div>
+      <div class="field"><label>สต็อกปัจจุบัน</label><input type="number" id="matStock" min="0" step="0.01" value="0" /></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>ราคาทุน/หน่วย (฿) *</label><input type="number" id="matCost" min="0" step="0.01" value="0" /></div>
+      <div class="field"><label>แจ้งเตือนเมื่อต่ำกว่า</label><input type="number" id="matMin" min="0" step="0.01" value="0" /></div>
+    </div>
+    <div class="field"><label>หมายเหตุ</label><input type="text" id="matNote" /></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('materialModal')">ยกเลิก</button>
+      <button class="btn" onclick="saveMaterial()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="menuModal">
+  <div class="modal">
+    <h2 id="menuModalTitle">เพิ่มเมนู</h2>
+    <div class="field"><label>ชื่อเมนู *</label><input type="text" id="menuName" /></div>
+    <div class="field-row">
+      <div class="field"><label>หมวด</label><input type="text" id="menuCategory" placeholder="อาหาร / เครื่องดื่ม" /></div>
+      <div class="field"><label>ราคาขาย (฿) *</label><input type="number" id="menuPrice" min="0" step="0.01" value="0" /></div>
+    </div>
+    <div class="field">
+      <label>สูตร (วัตถุดิบที่ใช้)</label>
+      <div id="recipeItems"></div>
+      <button class="btn small ghost" type="button" onclick="addRecipeRow()">+ เพิ่มวัตถุดิบ</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('menuModal')">ยกเลิก</button>
+      <button class="btn" onclick="saveMenu()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="qrModal">
+  <div class="modal" style="max-width:380px">
+    <h2 id="qrTitle">QR Code</h2>
+    <div class="qr-box" id="qrBox"></div>
+    <p class="hint" id="qrCaption" style="text-align:center; margin-top:10px"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="printQR()">🖨️ พิมพ์</button>
+      <button class="btn secondary" onclick="closeModal('qrModal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="scannerModal">
+  <div class="modal">
+    <h2>📷 สแกน QR Code</h2>
+    <video id="scanner-video" autoplay playsinline></video>
+    <canvas id="scanner-canvas"></canvas>
+    <p class="hint" id="scannerHint" style="text-align:center">กำลังเปิดกล้อง...</p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeScanner()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="orderDetailModal">
+  <div class="modal">
+    <h2>รายละเอียดออเดอร์</h2>
+    <div id="orderDetailBody"></div>
+    <div class="modal-actions">
+      <button class="btn danger" onclick="deleteCurrentOrder()">🗑️ ลบ (คืนสต็อก)</button>
+      <button class="btn secondary" onclick="closeModal('orderDetailModal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== STATE ======
+let state = {
+  shopName: 'คุณตุ่น',
+  materials: [],
+  menus: [],
+  orders: [],
+  pendingOrders: []
+};
+let cart = [];
+let editingMatId = null;
+let editingMenuId = null;
+let activeTab = 'dashboard';
+let reportRange = 'today';
+let scannerStream = null;
+let scannerRAF = null;
+let scannerMode = 'pos'; // pos = add menu to cart; customer-submit = scan customer order
+let viewingOrderId = null;
+
+const STORAGE_KEY = 'stockCostApp_v2';
+const isCustomerView = new URLSearchParams(location.search).get('view') === 'customer';
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) try { state = { ...state, ...JSON.parse(raw) }; } catch(e) {}
+  // migration from v1
+  const v1 = localStorage.getItem('stockCostApp_v1');
+  if (v1 && !raw) {
+    try { const d = JSON.parse(v1); state.materials = d.materials || []; state.menus = d.menus || []; save(); } catch(e) {}
+  }
+}
+function fmt(n) {
+  return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('th-TH', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ====== TABS ======
+document.querySelectorAll('#mainNav button').forEach(b => {
+  b.addEventListener('click', () => {
+    activeTab = b.dataset.tab;
+    document.querySelectorAll('#mainNav button').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + activeTab));
+    if (activeTab === 'dashboard') renderDashboard();
+    if (activeTab === 'pos') renderPOS();
+    if (activeTab === 'reports') renderReports();
+    if (activeTab === 'calc') { populateCalcSelect(); renderCalc(); }
+  });
+});
+
+// ====== MATERIALS ======
+function renderMaterials() {
+  const q = (document.getElementById('searchMat')?.value || '').toLowerCase();
+  const list = document.getElementById('materialList');
+  const filtered = state.materials.filter(m => m.name.toLowerCase().includes(q));
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">ยังไม่มีวัตถุดิบ — กด "+ เพิ่มวัตถุดิบ"</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(m => {
+    const low = m.minStock > 0 && m.stock <= m.minStock;
+    return `<div class="card ${low?'low':''}">
+      <h3>${escapeHtml(m.name)} ${low?'<span class="badge low">ใกล้หมด</span>':''}</h3>
+      <div class="meta">${escapeHtml(m.note||'')}</div>
+      <div class="row"><span>สต็อก</span><b>${fmt(m.stock)} ${escapeHtml(m.unit)}</b></div>
+      <div class="row"><span>ราคาทุน</span><b>${fmt(m.cost)} ฿/${escapeHtml(m.unit)}</b></div>
+      <div class="row"><span>มูลค่า</span><b>${fmt(m.stock * m.cost)} ฿</b></div>
+      <div class="actions">
+        <button class="btn small secondary" onclick="adjustStock('${m.id}')">ปรับสต็อก</button>
+        <button class="btn small ghost" onclick="editMaterial('${m.id}')">แก้</button>
+        <button class="btn small danger" onclick="deleteMaterial('${m.id}')">ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openMaterialModal(id) {
+  editingMatId = id || null;
+  document.getElementById('matModalTitle').textContent = id ? 'แก้ไขวัตถุดิบ' : 'เพิ่มวัตถุดิบ';
+  const m = id ? state.materials.find(x=>x.id===id) : { name:'', unit:'', stock:0, cost:0, minStock:0, note:'' };
+  document.getElementById('matName').value = m.name;
+  document.getElementById('matUnit').value = m.unit;
+  document.getElementById('matStock').value = m.stock;
+  document.getElementById('matCost').value = m.cost;
+  document.getElementById('matMin').value = m.minStock;
+  document.getElementById('matNote').value = m.note || '';
+  document.getElementById('materialModal').classList.add('active');
+}
+function editMaterial(id){ openMaterialModal(id); }
+function saveMaterial() {
+  const name = document.getElementById('matName').value.trim();
+  const unit = document.getElementById('matUnit').value.trim();
+  if (!name || !unit) return alert('กรอกชื่อและหน่วย');
+  const data = { name, unit,
+    stock: parseFloat(document.getElementById('matStock').value)||0,
+    cost: parseFloat(document.getElementById('matCost').value)||0,
+    minStock: parseFloat(document.getElementById('matMin').value)||0,
+    note: document.getElementById('matNote').value.trim()
+  };
+  if (editingMatId) {
+    const i = state.materials.findIndex(m=>m.id===editingMatId);
+    state.materials[i] = { ...state.materials[i], ...data };
+  } else state.materials.push({ id: uid(), ...data });
+  save(); closeModal('materialModal'); renderMaterials(); renderDashboard();
+}
+function deleteMaterial(id) {
+  if (state.menus.some(m => m.recipe.some(r => r.matId === id)) && !confirm('ถูกใช้ในเมนู ลบต่อ?')) return;
+  if (!confirm('ลบวัตถุดิบนี้?')) return;
+  state.materials = state.materials.filter(m=>m.id!==id);
+  state.menus.forEach(m => m.recipe = m.recipe.filter(r=>r.matId!==id));
+  save(); renderMaterials();
+}
+function adjustStock(id) {
+  const m = state.materials.find(x=>x.id===id);
+  const v = prompt(`ปรับสต็อก "${m.name}" (+/- หรือใส่ค่าใหม่)\nคงเหลือ: ${m.stock} ${m.unit}`, '');
+  if (v === null) return;
+  const t = v.trim();
+  let n = (t.startsWith('+') || t.startsWith('-')) ? m.stock + parseFloat(t) : parseFloat(t);
+  if (isNaN(n) || n < 0) return alert('ค่าไม่ถูกต้อง');
+  m.stock = n; save(); renderMaterials(); renderDashboard();
+}
+
+// ====== MENUS ======
+function renderMenus() {
+  const q = (document.getElementById('searchMenu')?.value || '').toLowerCase();
+  const list = document.getElementById('menuList');
+  const filtered = state.menus.filter(m => m.name.toLowerCase().includes(q));
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">ยังไม่มีเมนู — กด "+ เพิ่มเมนู"</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(menu => {
+    const cost = recipeCost(menu);
+    const profit = (menu.price||0) - cost;
+    const margin = menu.price > 0 ? (profit/menu.price*100) : 0;
+    return `<div class="card">
+      <h3>${escapeHtml(menu.name)} <span class="badge ${margin>=60?'ok':margin>=40?'warn':'low'}">${margin.toFixed(0)}%</span></h3>
+      <div class="meta">${escapeHtml(menu.category||'-')}</div>
+      <div class="row"><span>ราคาขาย</span><b>${fmt(menu.price)} ฿</b></div>
+      <div class="row"><span>ต้นทุน</span><b>${fmt(cost)} ฿</b></div>
+      <div class="row"><span>กำไร/จาน</span><b style="color:${profit>=0?'var(--success)':'var(--danger)'}">${fmt(profit)} ฿</b></div>
+      <div class="actions">
+        <button class="btn small ghost" onclick="showMenuQR('${menu.id}')">📱 QR</button>
+        <button class="btn small ghost" onclick="editMenu('${menu.id}')">แก้</button>
+        <button class="btn small danger" onclick="deleteMenu('${menu.id}')">ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openMenuModal(id) {
+  editingMenuId = id || null;
+  document.getElementById('menuModalTitle').textContent = id ? 'แก้ไขเมนู' : 'เพิ่มเมนู';
+  const m = id ? state.menus.find(x=>x.id===id) : { name:'', category:'', price:0, recipe:[] };
+  document.getElementById('menuName').value = m.name;
+  document.getElementById('menuCategory').value = m.category || '';
+  document.getElementById('menuPrice').value = m.price;
+  document.getElementById('recipeItems').innerHTML = '';
+  (m.recipe.length ? m.recipe : [{matId:'',qty:0}]).forEach(r=>addRecipeRow(r));
+  document.getElementById('menuModal').classList.add('active');
+}
+function addRecipeRow(r) {
+  r = r || { matId:'', qty:0 };
+  const div = document.createElement('div');
+  div.className = 'recipe-item';
+  const opts = state.materials.map(m=>`<option value="${m.id}" ${m.id===r.matId?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
+  const unit = state.materials.find(m=>m.id===r.matId)?.unit || '';
+  div.innerHTML = `
+    <select onchange="updateUnitLabel(this)"><option value="">-- เลือก --</option>${opts}</select>
+    <input type="number" min="0" step="0.001" value="${r.qty}" placeholder="ปริมาณ" />
+    <div class="unit-label">${escapeHtml(unit)}</div>
+    <button class="btn small danger" type="button" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('recipeItems').appendChild(div);
+}
+function updateUnitLabel(sel) {
+  sel.parentElement.querySelector('.unit-label').textContent = state.materials.find(m=>m.id===sel.value)?.unit || '';
+}
+function editMenu(id){ openMenuModal(id); }
+function saveMenu() {
+  const name = document.getElementById('menuName').value.trim();
+  if (!name) return alert('กรอกชื่อเมนู');
+  const recipe = [];
+  document.querySelectorAll('#recipeItems .recipe-item').forEach(row => {
+    const sel = row.querySelector('select');
+    const qty = parseFloat(row.querySelector('input').value);
+    if (sel.value && qty > 0) recipe.push({ matId: sel.value, qty });
+  });
+  const data = { name,
+    category: document.getElementById('menuCategory').value.trim(),
+    price: parseFloat(document.getElementById('menuPrice').value)||0,
+    recipe
+  };
+  if (editingMenuId) {
+    const i = state.menus.findIndex(m=>m.id===editingMenuId);
+    state.menus[i] = { ...state.menus[i], ...data };
+  } else state.menus.push({ id: uid(), ...data });
+  save(); closeModal('menuModal'); renderMenus(); renderDashboard(); renderPOS();
+}
+function deleteMenu(id) {
+  if (!confirm('ลบเมนูนี้?')) return;
+  state.menus = state.menus.filter(m=>m.id!==id);
+  save(); renderMenus();
+}
+function recipeCost(menu) {
+  return (menu.recipe||[]).reduce((s,r) => {
+    const m = state.materials.find(x=>x.id===r.matId);
+    return s + (m ? m.cost * r.qty : 0);
+  }, 0);
+}
+
+// ====== POS ======
+function renderPOS() {
+  // category filter
+  const cats = [...new Set(state.menus.map(m=>m.category).filter(Boolean))];
+  const catSel = document.getElementById('posCategoryFilter');
+  if (catSel) {
+    const cur = catSel.value;
+    catSel.innerHTML = '<option value="">ทุกหมวด</option>' + cats.map(c=>`<option value="${escapeHtml(c)}" ${c===cur?'selected':''}>${escapeHtml(c)}</option>`).join('');
+  }
+  renderPOSMenus();
+  renderCart();
+  renderPendingOrders();
+}
+function renderPOSMenus() {
+  const q = (document.getElementById('posSearch')?.value || '').toLowerCase();
+  const cat = document.getElementById('posCategoryFilter')?.value || '';
+  const grid = document.getElementById('posMenuGrid');
+  const filtered = state.menus.filter(m => m.name.toLowerCase().includes(q) && (!cat || m.category === cat));
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty">ไม่มีเมนู — สร้างได้ที่แท็บ "เมนู"</div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(m => `
+    <button class="menu-btn" onclick="addToCart('${m.id}')">
+      <div class="name">${escapeHtml(m.name)}</div>
+      <div class="cat">${escapeHtml(m.category||'-')}</div>
+      <div class="price">${fmt(m.price)} ฿</div>
+    </button>
+  `).join('');
+}
+function addToCart(menuId, qty=1) {
+  const menu = state.menus.find(m=>m.id===menuId);
+  if (!menu) { toast('ไม่พบเมนู'); return; }
+  const ex = cart.find(c=>c.menuId===menuId);
+  if (ex) ex.qty += qty;
+  else cart.push({ menuId, qty });
+  renderCart();
+  toast(`+ ${menu.name}`);
+}
+function changeQty(menuId, delta) {
+  const c = cart.find(x=>x.menuId===menuId);
+  if (!c) return;
+  c.qty += delta;
+  if (c.qty <= 0) cart = cart.filter(x=>x.menuId!==menuId);
+  renderCart();
+}
+function removeCartItem(menuId) {
+  cart = cart.filter(x=>x.menuId!==menuId);
+  renderCart();
+}
+function clearCart() { cart = []; document.getElementById('cartNote').value=''; renderCart(); }
+function renderCart() {
+  const itemsBox = document.getElementById('cartItems');
+  const totalBox = document.getElementById('cartTotal');
+  const count = cart.reduce((s,c)=>s+c.qty,0);
+  document.getElementById('cartCount').textContent = count;
+  document.getElementById('confirmBtn').disabled = count === 0;
+  if (!cart.length) {
+    itemsBox.innerHTML = `<div class="empty" style="padding:20px 10px">— ยังไม่มีรายการ —</div>`;
+    totalBox.style.display = 'none';
+    return;
+  }
+  itemsBox.innerHTML = cart.map(c => {
+    const m = state.menus.find(x=>x.id===c.menuId);
+    if (!m) return '';
+    return `<div class="cart-item">
+      <div>${escapeHtml(m.name)}<br><small style="color:var(--muted)">${fmt(m.price)} ฿</small></div>
+      <div class="qty-ctl">
+        <button onclick="changeQty('${c.menuId}',-1)">−</button>
+        <span>${c.qty}</span>
+        <button onclick="changeQty('${c.menuId}',1)">+</button>
+      </div>
+      <div style="font-weight:600">${fmt(m.price*c.qty)}</div>
+    </div>`;
+  }).join('');
+  let subtotal=0, cost=0;
+  cart.forEach(c => {
+    const m = state.menus.find(x=>x.id===c.menuId);
+    if (m) { subtotal += m.price*c.qty; cost += recipeCost(m)*c.qty; }
+  });
+  document.getElementById('cartSubtotal').textContent = fmt(subtotal) + ' ฿';
+  document.getElementById('cartCost').textContent = fmt(cost) + ' ฿';
+  document.getElementById('cartProfit').textContent = fmt(subtotal-cost) + ' ฿';
+  document.getElementById('cartFinal').textContent = fmt(subtotal) + ' ฿';
+  totalBox.style.display = 'block';
+}
+function confirmOrder() {
+  if (!cart.length) return;
+  const order = buildOrder(cart, document.getElementById('cartNote').value.trim(), 'pos');
+  deductStock(order);
+  state.orders.unshift(order);
+  save();
+  toast(`บันทึก ${fmt(order.total)} ฿ แล้ว`);
+  clearCart();
+  renderPOS();
+  renderDashboard();
+}
+function buildOrder(items, note, source) {
+  let total=0, cost=0;
+  const detailedItems = items.map(c => {
+    const m = state.menus.find(x=>x.id===c.menuId);
+    if (!m) return null;
+    const lineCost = recipeCost(m)*c.qty;
+    const lineTotal = m.price*c.qty;
+    total += lineTotal; cost += lineCost;
+    return { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: recipeCost(m) };
+  }).filter(Boolean);
+  return {
+    id: uid(),
+    timestamp: new Date().toISOString(),
+    items: detailedItems,
+    total, cost, profit: total - cost,
+    note, source
+  };
+}
+function deductStock(order) {
+  order.items.forEach(it => {
+    const menu = state.menus.find(m=>m.id===it.menuId);
+    if (!menu) return;
+    menu.recipe.forEach(r => {
+      const mat = state.materials.find(x=>x.id===r.matId);
+      if (mat) mat.stock = Math.max(0, mat.stock - r.qty * it.qty);
+    });
+  });
+}
+function restoreStock(order) {
+  order.items.forEach(it => {
+    const menu = state.menus.find(m=>m.id===it.menuId);
+    if (!menu) return;
+    menu.recipe.forEach(r => {
+      const mat = state.materials.find(x=>x.id===r.matId);
+      if (mat) mat.stock = mat.stock + r.qty * it.qty;
+    });
+  });
+}
+document.getElementById('posSearch')?.addEventListener('input', renderPOSMenus);
+document.getElementById('posCategoryFilter')?.addEventListener('change', renderPOSMenus);
+
+// ====== PENDING ORDERS (from customer view) ======
+function renderPendingOrders() {
+  const box = document.getElementById('pendingOrdersBox');
+  if (!state.pendingOrders.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="card" style="background:#fefce8; border-color:#facc15; margin-bottom:12px">
+    <h3 style="margin:0 0 8px">🔔 ออเดอร์รอยืนยัน (${state.pendingOrders.length})</h3>
+    ${state.pendingOrders.map((p,i) => `
+      <div style="border-top:1px dashed #ccc; padding:8px 0">
+        <div style="font-size:12px; color:var(--muted)">${fmtTime(p.timestamp)} ${p.note?'• '+escapeHtml(p.note):''}</div>
+        <div style="margin:4px 0">${p.items.map(it=>`${escapeHtml(it.name)} ×${it.qty}`).join(', ')}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <b>${fmt(p.total)} ฿</b>
+          <div>
+            <button class="btn small success" onclick="acceptPending(${i})">✓ ยืนยัน</button>
+            <button class="btn small danger" onclick="rejectPending(${i})">✕ ปฏิเสธ</button>
+          </div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+function acceptPending(idx) {
+  const p = state.pendingOrders[idx];
+  // Recalculate cost from owner's local recipes (customer view doesn't have recipes)
+  let totalCost = 0;
+  p.items.forEach(it => {
+    const menu = state.menus.find(m=>m.id===it.menuId);
+    if (menu) {
+      const c = recipeCost(menu);
+      it.cost = c;
+      totalCost += c * it.qty;
+    }
+  });
+  p.cost = totalCost;
+  p.profit = p.total - totalCost;
+  deductStock(p);
+  state.orders.unshift({ ...p, source: p.source || 'customer-qr' });
+  state.pendingOrders.splice(idx,1);
+  save(); renderPOS(); renderDashboard(); toast('ยืนยันออเดอร์แล้ว');
+}
+function rejectPending(idx) {
+  if (!confirm('ปฏิเสธออเดอร์นี้?')) return;
+  state.pendingOrders.splice(idx,1);
+  save(); renderPOS();
+}
+function addPendingOrder(p) {
+  state.pendingOrders.push(p);
+  save();
+}
+
+// ====== QR GEN ======
+function makeQR(text, size=280) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createImgTag(Math.ceil(size/qr.getModuleCount()), 8);
+}
+function showMenuQR(menuId) {
+  const m = state.menus.find(x=>x.id===menuId);
+  if (!m) return;
+  document.getElementById('qrTitle').textContent = m.name;
+  const data = JSON.stringify({ type: 'menu', id: menuId, name: m.name });
+  document.getElementById('qrBox').innerHTML = makeQR(data);
+  document.getElementById('qrCaption').textContent = `สแกนใน POS เพื่อเพิ่มเมนู "${m.name}"`;
+  document.getElementById('qrModal').classList.add('active');
+}
+// Compress data to URL-safe base64 (for embedding in QR)
+function compressToB64(obj) {
+  const json = JSON.stringify(obj);
+  const compressed = pako.deflate(json);
+  let bin = '';
+  for (let i = 0; i < compressed.length; i++) bin += String.fromCharCode(compressed[i]);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function decompressFromB64(str) {
+  let b64 = str.replace(/-/g,'+').replace(/_/g,'/');
+  while (b64.length % 4) b64 += '=';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(pako.inflate(bytes, { to: 'string' }));
+}
+
+function openCustomerQR() {
+  // Build minimal menu payload (no recipes — not needed for customer)
+  const payload = {
+    s: state.shopName || 'ร้านอาหาร',
+    m: state.menus.map(m => [m.id, m.name, m.category || '', m.price])
+  };
+  const data = compressToB64(payload);
+  const url = location.origin + location.pathname + '?view=customer#m=' + data;
+  const tooBig = url.length > 2900;
+  document.getElementById('qrTitle').textContent = '📱 QR สั่งอาหารสำหรับลูกค้า';
+  if (tooBig) {
+    // Fallback: simple URL without menu data
+    const simpleUrl = location.origin + location.pathname + '?view=customer';
+    document.getElementById('qrBox').innerHTML = makeQR(simpleUrl);
+    document.getElementById('qrCaption').innerHTML = `<b style="color:var(--warning)">⚠️ เมนูเยอะเกินใส่ใน QR</b><br>QR นี้ใช้ได้เฉพาะอุปกรณ์เดียวกันที่มีข้อมูลแล้ว<br><small style="word-break:break-all; font-size:10px">${escapeHtml(simpleUrl)}</small>`;
+  } else {
+    document.getElementById('qrBox').innerHTML = makeQR(url, 360);
+    document.getElementById('qrCaption').innerHTML = `ลูกค้าสแกน → เห็นเมนู ${state.menus.length} รายการในมือถือ → สั่ง<br><small style="color:var(--muted)">ลูกค้าสั่งเสร็จ จะได้ QR ตอบกลับ ให้พนักงานสแกนยืนยันออเดอร์</small><br><br><b style="color:var(--info)">📌 ต้องอัปโหลดไฟล์ขึ้น web hosting</b> (ฟรี: GitHub Pages, Netlify) ลูกค้าจึงสแกนได้`;
+  }
+  document.getElementById('qrModal').classList.add('active');
+}
+function previewCustomerView() {
+  window.open(location.pathname + '?view=customer', '_blank');
+}
+function printQR() {
+  const html = document.getElementById('qrBox').innerHTML;
+  const cap = document.getElementById('qrCaption').textContent;
+  const w = window.open('', '_blank');
+  w.document.write(`<html><head><title>QR</title></head><body style="text-align:center; padding:40px; font-family:sans-serif">${html}<p>${cap}</p></body></html>`);
+  w.document.close(); w.print();
+}
+
+// ====== QR SCANNER ======
+function openScanner(mode='pos') {
+  scannerMode = mode;
+  document.getElementById('scannerModal').classList.add('active');
+  document.getElementById('scannerHint').textContent = 'กำลังเปิดกล้อง...';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      scannerStream = stream;
+      const v = document.getElementById('scanner-video');
+      v.srcObject = stream;
+      v.play();
+      document.getElementById('scannerHint').textContent = 'นำกล้องจ่อ QR Code';
+      scanLoop();
+    })
+    .catch(err => {
+      document.getElementById('scannerHint').textContent = 'เปิดกล้องไม่ได้: ' + err.message;
+    });
+}
+function scanLoop() {
+  const v = document.getElementById('scanner-video');
+  const c = document.getElementById('scanner-canvas');
+  if (v.readyState === v.HAVE_ENOUGH_DATA) {
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const img = ctx.getImageData(0, 0, c.width, c.height);
+    const code = jsQR(img.data, img.width, img.height);
+    if (code) {
+      handleScannedQR(code.data);
+      return;
+    }
+  }
+  scannerRAF = requestAnimationFrame(scanLoop);
+}
+function handleScannedQR(data) {
+  try {
+    const obj = JSON.parse(data);
+    if (obj.type === 'menu') {
+      addToCart(obj.id);
+      closeScanner();
+      return;
+    }
+    if (obj.type === 'order') {
+      // customer order via QR
+      const order = obj.order;
+      order.id = uid();
+      order.timestamp = new Date().toISOString();
+      order.source = 'customer-qr';
+      addPendingOrder(order);
+      closeScanner();
+      toast('ได้รับออเดอร์จากลูกค้า กดยืนยัน');
+      renderPOS();
+      return;
+    }
+  } catch(e) {}
+  document.getElementById('scannerHint').textContent = 'QR ไม่ถูกต้อง: ' + data.slice(0,30);
+  setTimeout(()=>scanLoop(), 1500);
+}
+function closeScanner() {
+  if (scannerRAF) cancelAnimationFrame(scannerRAF);
+  if (scannerStream) scannerStream.getTracks().forEach(t=>t.stop());
+  scannerStream = null;
+  document.getElementById('scannerModal').classList.remove('active');
+}
+
+// ====== REPORTS ======
+function setReportRange(r) {
+  reportRange = r;
+  document.querySelectorAll('.report-controls button').forEach(b=>b.classList.toggle('active', b.dataset.range===r));
+  renderReports();
+}
+function getRangeOrders() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from;
+  if (reportRange === 'today') from = today;
+  else if (reportRange === 'yesterday') { from = new Date(today); from.setDate(today.getDate()-1); }
+  else if (reportRange === '7d') { from = new Date(today); from.setDate(today.getDate()-6); }
+  else if (reportRange === '30d') { from = new Date(today); from.setDate(today.getDate()-29); }
+  else from = new Date(0);
+  const to = reportRange === 'yesterday' ? today : new Date(now.getTime()+86400000);
+  return state.orders.filter(o => {
+    const d = new Date(o.timestamp);
+    return d >= from && d < to;
+  });
+}
+function renderReports() {
+  const orders = getRangeOrders();
+  const revenue = orders.reduce((s,o)=>s+o.total,0);
+  const cost = orders.reduce((s,o)=>s+o.cost,0);
+  const profit = revenue - cost;
+  const margin = revenue ? (profit/revenue*100) : 0;
+  document.getElementById('reportStats').innerHTML = `
+    <div class="stat"><div class="label">จำนวนออเดอร์</div><div class="value">${orders.length}</div></div>
+    <div class="stat"><div class="label">ยอดขาย</div><div class="value">${fmt(revenue)} ฿</div></div>
+    <div class="stat"><div class="label">ต้นทุนวัตถุดิบ</div><div class="value">${fmt(cost)} ฿</div></div>
+    <div class="stat"><div class="label">กำไรขั้นต้น</div><div class="value" style="color:${profit>=0?'var(--success)':'var(--danger)'}">${fmt(profit)} ฿</div><div class="sub">${margin.toFixed(1)}%</div></div>
+  `;
+  renderWeekChart();
+  renderTopSellers(orders);
+  renderOrdersTable(orders);
+}
+function renderWeekChart() {
+  const days = [];
+  const now = new Date();
+  for (let i=6; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i);
+    const next = new Date(d.getTime()+86400000);
+    const total = state.orders.filter(o => {
+      const t = new Date(o.timestamp);
+      return t >= d && t < next;
+    }).reduce((s,o)=>s+o.total,0);
+    days.push({ label: d.toLocaleDateString('th-TH',{day:'2-digit',month:'short'}), total });
+  }
+  const max = Math.max(...days.map(d=>d.total), 1);
+  document.getElementById('weekChart').innerHTML = days.map(d => `
+    <div class="bar-col">
+      <div class="bar-value">${d.total > 0 ? fmt(d.total) : ''}</div>
+      <div class="bar" style="height:${(d.total/max*140)}px; background:${d.total>0?'var(--primary)':'#e5e7eb'}"></div>
+      <div class="bar-label">${d.label}</div>
+    </div>`).join('');
+}
+function renderTopSellers(orders) {
+  const counts = {};
+  orders.forEach(o => o.items.forEach(it => {
+    if (!counts[it.menuId]) counts[it.menuId] = { name: it.name, qty: 0, revenue: 0, profit: 0 };
+    counts[it.menuId].qty += it.qty;
+    counts[it.menuId].revenue += it.price * it.qty;
+    counts[it.menuId].profit += (it.price - it.cost) * it.qty;
+  }));
+  const top = Object.values(counts).sort((a,b)=>b.qty-a.qty).slice(0,10);
+  const box = document.getElementById('topSellersBox');
+  if (!top.length) { box.innerHTML = '<div class="empty">ยังไม่มียอดขาย</div>'; return; }
+  box.innerHTML = `<table class="simple">
+    <thead><tr><th>เมนู</th><th class="num">ขาย</th><th class="num">ยอดขาย</th><th class="num">กำไร</th></tr></thead>
+    <tbody>${top.map(t=>`<tr><td>${escapeHtml(t.name)}</td><td class="num">${t.qty}</td><td class="num">${fmt(t.revenue)}</td><td class="num">${fmt(t.profit)}</td></tr>`).join('')}</tbody>
+  </table>`;
+}
+function renderOrdersTable(orders) {
+  const tbody = document.querySelector('#ordersTable tbody');
+  if (!orders.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted)">ยังไม่มีออเดอร์</td></tr>'; return; }
+  tbody.innerHTML = orders.slice(0, 100).map(o => `
+    <tr>
+      <td>${fmtTime(o.timestamp)}</td>
+      <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}${o.note?'<br><small style="color:var(--muted)">'+escapeHtml(o.note)+'</small>':''}</td>
+      <td class="num">${fmt(o.total)}</td>
+      <td class="num" style="color:${o.profit>=0?'var(--success)':'var(--danger)'}">${fmt(o.profit)}</td>
+      <td class="actions-cell"><button class="btn small ghost" onclick="viewOrder('${o.id}')">ดู</button></td>
+    </tr>
+  `).join('');
+}
+function viewOrder(id) {
+  const o = state.orders.find(x=>x.id===id);
+  if (!o) return;
+  viewingOrderId = id;
+  document.getElementById('orderDetailBody').innerHTML = `
+    <div class="hint">${fmtTime(o.timestamp)} • ${o.source||'pos'}${o.note?' • '+escapeHtml(o.note):''}</div>
+    <table class="simple" style="margin-top:8px">
+      <thead><tr><th>เมนู</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th></tr></thead>
+      <tbody>${o.items.map(it=>`<tr><td>${escapeHtml(it.name)}</td><td class="num">${it.qty}</td><td class="num">${fmt(it.price)}</td><td class="num">${fmt(it.price*it.qty)}</td></tr>`).join('')}</tbody>
+      <tfoot>
+        <tr><th colspan="3">ยอดขาย</th><th class="num">${fmt(o.total)}</th></tr>
+        <tr><th colspan="3">ต้นทุน</th><th class="num">${fmt(o.cost)}</th></tr>
+        <tr><th colspan="3">กำไร</th><th class="num" style="color:var(--success)">${fmt(o.profit)}</th></tr>
+      </tfoot>
+    </table>`;
+  document.getElementById('orderDetailModal').classList.add('active');
+}
+function deleteCurrentOrder() {
+  if (!viewingOrderId) return;
+  if (!confirm('ลบออเดอร์นี้และคืนสต็อก?')) return;
+  const i = state.orders.findIndex(x=>x.id===viewingOrderId);
+  if (i < 0) return;
+  restoreStock(state.orders[i]);
+  state.orders.splice(i,1);
+  save(); closeModal('orderDetailModal'); renderReports(); renderDashboard(); toast('ลบและคืนสต็อกแล้ว');
+}
+
+// ====== CALC ======
+function populateCalcSelect() {
+  const sel = document.getElementById('calcMenuSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- เลือก --</option>' + state.menus.map(m=>`<option value="${m.id}" ${m.id===cur?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
+}
+function renderCalc() {
+  const id = document.getElementById('calcMenuSelect').value;
+  const box = document.getElementById('calcResult');
+  if (!id) { box.innerHTML = ''; return; }
+  const menu = state.menus.find(m=>m.id===id);
+  const cost = recipeCost(menu);
+  const price = menu.price||0;
+  const profit = price - cost;
+  const margin = price > 0 ? profit/price*100 : 0;
+  const fixed = parseFloat(document.getElementById('fixedCost').value)||0;
+  const qty = parseFloat(document.getElementById('qtyPerDay').value)||1;
+  const fixedPer = fixed/qty;
+  const net = profit - fixedPer;
+  const be = profit > 0 ? Math.ceil(fixed/profit) : Infinity;
+  const rows = menu.recipe.map(r => {
+    const m = state.materials.find(x=>x.id===r.matId);
+    if (!m) return '';
+    return `<tr><td>${escapeHtml(m.name)}</td><td class="num">${fmt(r.qty)} ${escapeHtml(m.unit)}</td><td class="num">${fmt(m.cost)}</td><td class="num">${fmt(m.cost*r.qty)}</td></tr>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="card" style="margin-top:12px">
+      <h3 style="margin:0 0 8px">${escapeHtml(menu.name)}</h3>
+      <table class="simple">
+        <thead><tr><th>วัตถุดิบ</th><th class="num">ปริมาณ</th><th class="num">฿/หน่วย</th><th class="num">รวม</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4" style="text-align:center; color:var(--muted)">— ยังไม่มีสูตร —</td></tr>'}</tbody>
+        <tfoot><tr><th colspan="3">ต้นทุนรวม</th><th class="num">${fmt(cost)} ฿</th></tr></tfoot>
+      </table>
+    </div>
+    <div class="summary-grid" style="margin-top:12px">
+      <div class="stat"><div class="label">ราคาขาย</div><div class="value">${fmt(price)} ฿</div></div>
+      <div class="stat"><div class="label">ต้นทุน</div><div class="value">${fmt(cost)} ฿</div></div>
+      <div class="stat"><div class="label">กำไรขั้นต้น</div><div class="value" style="color:${profit>=0?'var(--success)':'var(--danger)'}">${fmt(profit)} ฿</div><div class="sub">${margin.toFixed(1)}%</div></div>
+      <div class="stat"><div class="label">กำไรสุทธิ/จาน</div><div class="value" style="color:${net>=0?'var(--success)':'var(--danger)'}">${fmt(net)} ฿</div><div class="sub">หลังหักคงที่</div></div>
+      <div class="stat"><div class="label">จุดคุ้มทุน</div><div class="value">${be===Infinity?'—':be+' จาน/วัน'}</div></div>
+      <div class="stat"><div class="label">กำไร/วัน (ประมาณ)</div><div class="value" style="color:${net*qty>=0?'var(--success)':'var(--danger)'}">${fmt(net*qty)} ฿</div><div class="sub">@ ${qty} จาน</div></div>
+    </div>`;
+}
+
+// ====== DASHBOARD ======
+function renderDashboard() {
+  const totalMat = state.materials.length;
+  const totalMenu = state.menus.length;
+  const stockValue = state.materials.reduce((s,m)=>s+m.stock*m.cost, 0);
+  const lowCount = state.materials.filter(m=>m.minStock>0 && m.stock<=m.minStock).length;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayOrders = state.orders.filter(o => new Date(o.timestamp) >= today);
+  const todayRevenue = todayOrders.reduce((s,o)=>s+o.total,0);
+  const todayProfit = todayOrders.reduce((s,o)=>s+o.profit,0);
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat"><div class="label">ขายวันนี้</div><div class="value" style="color:var(--success)">${fmt(todayRevenue)} ฿</div><div class="sub">${todayOrders.length} ออเดอร์</div></div>
+    <div class="stat"><div class="label">กำไรวันนี้</div><div class="value">${fmt(todayProfit)} ฿</div></div>
+    <div class="stat"><div class="label">มูลค่าสต็อก</div><div class="value">${fmt(stockValue)} ฿</div></div>
+    <div class="stat"><div class="label">วัตถุดิบใกล้หมด</div><div class="value" style="color:${lowCount>0?'var(--danger)':'var(--success)'}">${lowCount}</div></div>
+    <div class="stat"><div class="label">วัตถุดิบ/เมนู</div><div class="value">${totalMat}/${totalMenu}</div></div>
+  `;
+  const pa = document.getElementById('pendingAlert');
+  pa.innerHTML = state.pendingOrders.length ? `<div class="card" style="background:#fefce8; border-color:#facc15">🔔 มีออเดอร์รอยืนยัน <b>${state.pendingOrders.length}</b> รายการ <button class="btn small" onclick="document.querySelector('#mainNav button[data-tab=pos]').click()">ไปที่ POS</button></div>` : '';
+  const low = state.materials.filter(m=>m.minStock>0 && m.stock<=m.minStock);
+  document.getElementById('lowStockList').innerHTML = low.length
+    ? low.map(m=>`<div class="card low"><h3>${escapeHtml(m.name)}</h3><div class="row"><span>คงเหลือ</span><b>${fmt(m.stock)} ${escapeHtml(m.unit)}</b></div><div class="row"><span>ขั้นต่ำ</span><b>${fmt(m.minStock)}</b></div></div>`).join('')
+    : `<div class="empty">✅ ไม่มีรายการแจ้งเตือน</div>`;
+  // Top sellers today
+  const counts = {};
+  todayOrders.forEach(o => o.items.forEach(it => {
+    if (!counts[it.menuId]) counts[it.menuId] = { name: it.name, qty: 0 };
+    counts[it.menuId].qty += it.qty;
+  }));
+  const top = Object.values(counts).sort((a,b)=>b.qty-a.qty).slice(0,3);
+  document.getElementById('topMenuList').innerHTML = top.length
+    ? top.map(t=>`<div class="card"><h3>${escapeHtml(t.name)}</h3><div class="row"><span>ขายวันนี้</span><b>${t.qty}</b></div></div>`).join('')
+    : `<div class="empty">ยังไม่มียอดขายวันนี้</div>`;
+}
+
+// ====== MODAL / UTIL ======
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+  if (id === 'scannerModal') closeScanner();
+}
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if (e.target===bg) closeModal(bg.id); }));
+
+// ====== SETTINGS ======
+function saveShopName() {
+  state.shopName = document.getElementById('shopName').value;
+  document.getElementById('appTitle').textContent = '🍜 ' + (state.shopName || 'ระบบจัดการสต็อก');
+  save();
+}
+function exportData() {
+  const blob = new Blob([JSON.stringify(state,null,2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `stock-cost-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+function importData(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (d.materials && d.menus) {
+        state = { ...state, ...d, orders: d.orders||[], pendingOrders: d.pendingOrders||[] };
+        save(); renderAll(); toast('นำเข้าสำเร็จ');
+      } else alert('รูปแบบไม่ถูกต้อง');
+    } catch { alert('ไฟล์เสียหาย'); }
+  };
+  r.readAsText(f);
+}
+function resetAll() {
+  if (!confirm('ลบข้อมูลทั้งหมด?')) return;
+  state = { shopName: state.shopName, materials:[], menus:[], orders:[], pendingOrders:[] };
+  save(); renderAll();
+}
+function loadKhunTun(force) {
+  if (!force && (state.materials.length||state.orders.length) && !confirm('แทนที่ข้อมูลปัจจุบันด้วยเมนูคุณตุ่น?')) return;
+  state = {
+    shopName: 'คุณตุ่น',
+    materials: [
+      { id:'c1', name:'เมล็ดกาแฟ Pangpun', unit:'กรัม', stock:2000, cost:1.2, minStock:500, note:'อาราบิก้าเบลนด์' },
+      { id:'c2', name:'ผงชาไทย', unit:'กรัม', stock:1000, cost:0.5, minStock:200, note:'' },
+      { id:'c3', name:'ผงชาเขียว', unit:'กรัม', stock:800, cost:1.0, minStock:200, note:'' },
+      { id:'c4', name:'ผงมัทฉะ', unit:'กรัม', stock:500, cost:3.0, minStock:100, note:'Premium grade' },
+      { id:'c5', name:'ผงโกโก้', unit:'กรัม', stock:800, cost:1.5, minStock:200, note:'' },
+      { id:'c6', name:'ผงโกโก้ดาร์ก', unit:'กรัม', stock:400, cost:2.0, minStock:100, note:'' },
+      { id:'c7', name:'ผงโอวัลติน', unit:'กรัม', stock:1000, cost:0.8, minStock:200, note:'' },
+      { id:'c8', name:'ผงเนสวิต้า', unit:'กรัม', stock:500, cost:1.0, minStock:100, note:'' },
+      { id:'c9', name:'ผงไวท์มอลต์', unit:'กรัม', stock:400, cost:1.2, minStock:100, note:'' },
+      { id:'c10', name:'ผงโอริโอ้บด', unit:'กรัม', stock:500, cost:1.5, minStock:100, note:'' },
+      { id:'c11', name:'ผงชาไต้หวัน', unit:'กรัม', stock:300, cost:0.8, minStock:100, note:'' },
+      { id:'c12', name:'ผงมิ้นท์', unit:'กรัม', stock:200, cost:1.5, minStock:50, note:'' },
+      { id:'m1', name:'นมสด', unit:'ลิตร', stock:30, cost:55, minStock:10, note:'' },
+      { id:'m2', name:'โยเกิร์ตสด', unit:'ลิตร', stock:5, cost:80, minStock:2, note:'' },
+      { id:'m3', name:'ครีมสด', unit:'ลิตร', stock:3, cost:100, minStock:1, note:'' },
+      { id:'s1', name:'น้ำตาลทราย', unit:'กก.', stock:10, cost:25, minStock:3, note:'' },
+      { id:'s2', name:'น้ำเชื่อม', unit:'ลิตร', stock:5, cost:30, minStock:2, note:'' },
+      { id:'s3', name:'บราวน์ชูการ์ไซรัป', unit:'ลิตร', stock:3, cost:90, minStock:1, note:'' },
+      { id:'s4', name:'น้ำผึ้ง', unit:'ลิตร', stock:2, cost:250, minStock:0.5, note:'' },
+      { id:'s5', name:'คาราเมลซอส', unit:'ลิตร', stock:2, cost:120, minStock:0.5, note:'' },
+      { id:'f1', name:'น้ำส้มคั้น', unit:'ลิตร', stock:5, cost:60, minStock:2, note:'' },
+      { id:'f2', name:'น้ำมะนาว', unit:'ลิตร', stock:3, cost:40, minStock:1, note:'' },
+      { id:'f3', name:'น้ำมะพร้าว', unit:'ลิตร', stock:8, cost:50, minStock:3, note:'' },
+      { id:'f4', name:'มะม่วง', unit:'กก.', stock:5, cost:60, minStock:1, note:'' },
+      { id:'f5', name:'แตงโม', unit:'กก.', stock:5, cost:30, minStock:2, note:'' },
+      { id:'f6', name:'กล้วยหอม', unit:'ลูก', stock:30, cost:8, minStock:10, note:'' },
+      { id:'f7', name:'อาโวคาโด', unit:'ลูก', stock:10, cost:35, minStock:3, note:'' },
+      { id:'f8', name:'สตรอเบอรี่ไซรัป', unit:'ลิตร', stock:2, cost:150, minStock:0.5, note:'' },
+      { id:'f9', name:'Pink syrup (น้ำชมพู)', unit:'ลิตร', stock:2, cost:50, minStock:0.5, note:'' },
+      { id:'d1', name:'M-150', unit:'ขวด', stock:24, cost:12, minStock:10, note:'' },
+      { id:'d2', name:'ปีโป้', unit:'ขวด', stock:30, cost:8, minStock:10, note:'' },
+      { id:'d3', name:'ยาคูลท์', unit:'ขวด', stock:50, cost:7, minStock:15, note:'' },
+      { id:'t1', name:'ไข่มุกบราวน์ชูการ์', unit:'กก.', stock:2, cost:80, minStock:0.5, note:'topping +10฿' },
+      { id:'t2', name:'เยลลี่เม็ดกลมแดง', unit:'กก.', stock:1, cost:100, minStock:0.3, note:'topping +10฿' },
+      { id:'t3', name:'โอวัลตินเฟล็ค', unit:'กก.', stock:0.5, cost:150, minStock:0.2, note:'topping +10฿' },
+      { id:'t4', name:'วิปครีม', unit:'ลิตร', stock:1, cost:120, minStock:0.3, note:'topping +15฿' },
+      { id:'t5', name:'คุกกี้โอริโอ้', unit:'ชิ้น', stock:50, cost:5, minStock:20, note:'' },
+      { id:'p1', name:'น้ำแข็ง', unit:'กก.', stock:20, cost:5, minStock:10, note:'' },
+      { id:'p2', name:'แก้วพลาสติก+ฝา+หลอด', unit:'ใบ', stock:300, cost:3.5, minStock:100, note:'' },
+      { id:'p3', name:'แก้วร้อน+ฝา', unit:'ใบ', stock:100, cost:4, minStock:30, note:'' }
+    ],
+    menus: [
+      { id:'sp1', name:'มัทฉะสตรอว์เบอร์รี่', category:'เมนูพิเศษ', price:75, recipe:[{matId:'c4',qty:8},{matId:'m1',qty:0.15},{matId:'f8',qty:0.03},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'sp2', name:'มัทฉะส้ม', category:'เมนูพิเศษ', price:70, recipe:[{matId:'c4',qty:8},{matId:'f1',qty:0.12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'sp3', name:'มัทฉะมะพร้าว', category:'เมนูพิเศษ', price:70, recipe:[{matId:'c4',qty:8},{matId:'f3',qty:0.18},{matId:'s2',qty:0.02},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'sp4', name:'มัทฉะโอริโอ้', category:'เมนูพิเศษ', price:70, recipe:[{matId:'c4',qty:8},{matId:'m1',qty:0.15},{matId:'c10',qty:10},{matId:'t5',qty:1},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'cf1', name:'อเมริกาโน่ (เย็น)', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:18},{matId:'p1',qty:0.25},{matId:'s2',qty:0.015},{matId:'p2',qty:1}] },
+      { id:'cf2', name:'อเมริกาโน่ลองช็อต', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:25},{matId:'p1',qty:0.3},{matId:'s2',qty:0.015},{matId:'p2',qty:1}] },
+      { id:'cf3', name:'ออเรนจ์กาโน่', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:18},{matId:'f1',qty:0.1},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf4', name:'แบล็คโกโก้', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:14},{matId:'c5',qty:8},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'cf5', name:'เอสเพรสโซ่ (เย็น)', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:20},{matId:'p1',qty:0.2},{matId:'s2',qty:0.015},{matId:'p2',qty:1}] },
+      { id:'cf6', name:'คาปูชิโน่ (เย็น)', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:18},{matId:'m1',qty:0.15},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf7', name:'ลาเต้ (เย็น)', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:18},{matId:'m1',qty:0.18},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf8', name:'มอคค่า (เย็น)', category:'กาแฟเย็น', price:60, recipe:[{matId:'c1',qty:18},{matId:'m1',qty:0.15},{matId:'c5',qty:8},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf9', name:'คาราเมลมัคคิอาโต้', category:'กาแฟเย็น', price:70, recipe:[{matId:'c1',qty:18},{matId:'m1',qty:0.15},{matId:'s5',qty:0.025},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf10', name:'ชาไทยลาเต้กาแฟ', category:'กาแฟเย็น', price:70, recipe:[{matId:'c1',qty:14},{matId:'c2',qty:10},{matId:'m1',qty:0.15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'cf11', name:'ชาเขียวลาเต้กาแฟ', category:'กาแฟเย็น', price:70, recipe:[{matId:'c1',qty:14},{matId:'c3',qty:8},{matId:'m1',qty:0.15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'hc1', name:'อเมริกาโน่ร้อน', category:'กาแฟร้อน', price:55, recipe:[{matId:'c1',qty:14},{matId:'s1',qty:0.005},{matId:'p3',qty:1}] },
+      { id:'hc2', name:'มอคค่าร้อน', category:'กาแฟร้อน', price:55, recipe:[{matId:'c1',qty:14},{matId:'m1',qty:0.1},{matId:'c5',qty:6},{matId:'s1',qty:0.005},{matId:'p3',qty:1}] },
+      { id:'hc3', name:'เอสเพรสโซ่ร้อน', category:'กาแฟร้อน', price:55, recipe:[{matId:'c1',qty:18},{matId:'p3',qty:1}] },
+      { id:'hc4', name:'ลาเต้ร้อน', category:'กาแฟร้อน', price:55, recipe:[{matId:'c1',qty:14},{matId:'m1',qty:0.15},{matId:'s1',qty:0.005},{matId:'p3',qty:1}] },
+      { id:'hc5', name:'คาปูชิโน่ร้อน', category:'กาแฟร้อน', price:55, recipe:[{matId:'c1',qty:14},{matId:'m1',qty:0.12},{matId:'s1',qty:0.005},{matId:'p3',qty:1}] },
+      { id:'bm1', name:'นมหมีปั่น', category:'นมหมีปั่น', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'s2',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm2', name:'นมหมีปั่นคาราเมล', category:'นมหมีปั่น', price:60, recipe:[{matId:'m1',qty:0.2},{matId:'s5',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm3', name:'นมหมีปั่นโอวัลตินภูเขาไฟ', category:'นมหมีปั่น', price:65, recipe:[{matId:'m1',qty:0.2},{matId:'c7',qty:15},{matId:'t3',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm4', name:'นมหมีปั่นโกโก้', category:'นมหมีปั่น', price:65, recipe:[{matId:'m1',qty:0.2},{matId:'c5',qty:15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm5', name:'นมหมีปั่นน้ำผึ้ง', category:'นมหมีปั่น', price:70, recipe:[{matId:'m1',qty:0.2},{matId:'s4',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm6', name:'นมหมีปั่นโอริโอ้', category:'นมหมีปั่น', price:60, recipe:[{matId:'m1',qty:0.2},{matId:'c10',qty:12},{matId:'t5',qty:1},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm7', name:'นมหมีปั่นบราว์ชูการ์', category:'นมหมีปั่น', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'s3',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm8', name:'นมหมีปั่นไวท์มอลต์', category:'นมหมีปั่น', price:70, recipe:[{matId:'m1',qty:0.2},{matId:'c9',qty:15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm9', name:'นมหมีสีชมพูปั่น', category:'นมหมีปั่น', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'f9',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm10', name:'นมหมีปั่นชาไทย', category:'นมหมีปั่น', price:60, recipe:[{matId:'m1',qty:0.18},{matId:'c2',qty:12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm11', name:'นมหมีปั่นชาเขียว', category:'นมหมีปั่น', price:60, recipe:[{matId:'m1',qty:0.18},{matId:'c3',qty:10},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm12', name:'นมหมีปั่นไต้หวัน', category:'นมหมีปั่น', price:60, recipe:[{matId:'m1',qty:0.18},{matId:'c11',qty:10},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'bm13', name:'นมหมีเนสวิต้าปั่น', category:'นมหมีปั่น', price:70, recipe:[{matId:'m1',qty:0.2},{matId:'c8',qty:18},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'fs1', name:'น้ำมะม่วงปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f4',qty:0.2},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs2', name:'M-150 ปีโป้ปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'d1',qty:1},{matId:'d2',qty:1},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs3', name:'โยเกิร์ตปีโป้ปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'m2',qty:0.12},{matId:'d2',qty:1},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'fs4', name:'นมสดปีโป้ปั่นสตอเบอรี่', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'m1',qty:0.15},{matId:'d2',qty:1},{matId:'f8',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs5', name:'ยาคูลท์ปีโป้ปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'d3',qty:2},{matId:'d2',qty:1},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'fs6', name:'อาโวคาโดนมสดน้ำผึ้งปั่น', category:'น้ำผลไม้ปั่น', price:70, recipe:[{matId:'f7',qty:0.5},{matId:'m1',qty:0.15},{matId:'s4',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs7', name:'น้ำส้มปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f1',qty:0.18},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs8', name:'น้ำมะพร้าวปั่นนมสด', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f3',qty:0.18},{matId:'m1',qty:0.12},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs9', name:'น้ำมะพร้าวปั่นไม่ใส่นม', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f3',qty:0.25},{matId:'s2',qty:0.015},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs10', name:'น้ำมะพร้าว + ชาไทย', category:'น้ำผลไม้ปั่น', price:60, recipe:[{matId:'f3',qty:0.18},{matId:'c2',qty:10},{matId:'m1',qty:0.08},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs11', name:'น้ำมะพร้าว + ชาเขียว', category:'น้ำผลไม้ปั่น', price:60, recipe:[{matId:'f3',qty:0.18},{matId:'c3',qty:8},{matId:'m1',qty:0.08},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs12', name:'น้ำมะพร้าว + โกโก้', category:'น้ำผลไม้ปั่น', price:60, recipe:[{matId:'f3',qty:0.18},{matId:'c5',qty:10},{matId:'m1',qty:0.08},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs13', name:'น้ำมะพร้าว + กาแฟ', category:'น้ำผลไม้ปั่น', price:70, recipe:[{matId:'f3',qty:0.18},{matId:'c1',qty:14},{matId:'m1',qty:0.08},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs14', name:'น้ำมะพร้าว + มัทฉะ', category:'น้ำผลไม้ปั่น', price:70, recipe:[{matId:'f3',qty:0.18},{matId:'c4',qty:6},{matId:'m1',qty:0.08},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs15', name:'น้ำแตงโมปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f5',qty:0.25},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'fs16', name:'กล้วยหอมนมสดปั่น', category:'น้ำผลไม้ปั่น', price:55, recipe:[{matId:'f6',qty:1},{matId:'m1',qty:0.18},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs17', name:'กล้วยหอมนมสดปั่น + ชาเขียว', category:'น้ำผลไม้ปั่น', price:55, recipe:[{matId:'f6',qty:1},{matId:'m1',qty:0.15},{matId:'c3',qty:6},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs18', name:'กล้วยหอมนมสดปั่น + ชาไทย', category:'น้ำผลไม้ปั่น', price:55, recipe:[{matId:'f6',qty:1},{matId:'m1',qty:0.15},{matId:'c2',qty:8},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs19', name:'กล้วยหอมนมสดปั่น + โกโก้', category:'น้ำผลไม้ปั่น', price:55, recipe:[{matId:'f6',qty:1},{matId:'m1',qty:0.15},{matId:'c5',qty:8},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs20', name:'น้ำมะนาวปั่น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f2',qty:0.05},{matId:'s2',qty:0.03},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'fs21', name:'น้ำมะนาวคั้น', category:'น้ำผลไม้ปั่น', price:50, recipe:[{matId:'f2',qty:0.05},{matId:'s2',qty:0.03},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fs22', name:'น้ำมะนาว + น้ำผึ้ง', category:'น้ำผลไม้ปั่น', price:60, recipe:[{matId:'f2',qty:0.05},{matId:'s4',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc1', name:'ชาไทย', category:'ชา/โกโก้', price:50, recipe:[{matId:'c2',qty:12},{matId:'m1',qty:0.12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc2', name:'ชาเขียว', category:'ชา/โกโก้', price:50, recipe:[{matId:'c3',qty:10},{matId:'m1',qty:0.12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc3', name:'มัทฉะลาเต้', category:'ชา/โกโก้', price:65, recipe:[{matId:'c4',qty:8},{matId:'m1',qty:0.18},{matId:'s2',qty:0.015},{matId:'p1',qty:0.2},{matId:'p2',qty:1}] },
+      { id:'tc4', name:'โกโก้มิ้นท์', category:'ชา/โกโก้', price:65, recipe:[{matId:'c5',qty:12},{matId:'c12',qty:5},{matId:'m1',qty:0.15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc5', name:'โกโก้', category:'ชา/โกโก้', price:50, recipe:[{matId:'c5',qty:15},{matId:'m1',qty:0.15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc6', name:'ดาร์กโกโก้', category:'ชา/โกโก้', price:65, recipe:[{matId:'c6',qty:15},{matId:'m1',qty:0.15},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc7', name:'ชาดำเย็น', category:'ชา/โกโก้', price:45, recipe:[{matId:'c2',qty:12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'tc8', name:'ชามะนาว', category:'ชา/โกโก้', price:45, recipe:[{matId:'c2',qty:10},{matId:'f2',qty:0.03},{matId:'s2',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'tc9', name:'โกโก้ไม่ใส่นม', category:'ชา/โกโก้', price:45, recipe:[{matId:'c5',qty:15},{matId:'s2',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'tc10', name:'ชาเขียวไม่ใส่นม', category:'ชา/โกโก้', price:45, recipe:[{matId:'c3',qty:10},{matId:'s2',qty:0.025},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'tc11', name:'ชานมไต้หวัน', category:'ชา/โกโก้', price:50, recipe:[{matId:'c11',qty:10},{matId:'m1',qty:0.12},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'tc12', name:'เพียวมัทฉะ', category:'ชา/โกโก้', price:60, recipe:[{matId:'c4',qty:10},{matId:'s2',qty:0.015},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] },
+      { id:'fm1', name:'นมสด', category:'นมสด', price:40, recipe:[{matId:'m1',qty:0.2},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm2', name:'นมชมพู', category:'นมสด', price:45, recipe:[{matId:'m1',qty:0.2},{matId:'f9',qty:0.025},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm3', name:'นมสดบราวน์ชูการ์', category:'นมสด', price:50, recipe:[{matId:'m1',qty:0.2},{matId:'s3',qty:0.03},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm4', name:'นมสดคาราเมล', category:'นมสด', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'s5',qty:0.025},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm5', name:'ไวท์มอลต์', category:'นมสด', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'c9',qty:15},{matId:'s2',qty:0.015},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm6', name:'นมสดมิ้นท์', category:'นมสด', price:55, recipe:[{matId:'m1',qty:0.2},{matId:'c12',qty:5},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm7', name:'นมสดภูเขาไฟ', category:'นมสด', price:50, recipe:[{matId:'m1',qty:0.2},{matId:'s3',qty:0.025},{matId:'t3',qty:0.015},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm8', name:'โอวัลตินภูเขาไฟ', category:'นมสด', price:55, recipe:[{matId:'m1',qty:0.18},{matId:'c7',qty:15},{matId:'t3',qty:0.015},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm9', name:'โอริโอ้ปั่น', category:'นมสด', price:50, recipe:[{matId:'m1',qty:0.18},{matId:'c10',qty:15},{matId:'t5',qty:1},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm10', name:'เนสวิต้าปั่น', category:'นมสด', price:60, recipe:[{matId:'m1',qty:0.18},{matId:'c8',qty:18},{matId:'s2',qty:0.02},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm11', name:'สตรอเบอรี่มิดไนท์', category:'นมสด', price:55, recipe:[{matId:'m1',qty:0.18},{matId:'f8',qty:0.03},{matId:'c6',qty:5},{matId:'p1',qty:0.25},{matId:'p2',qty:1}] },
+      { id:'fm12', name:'สตรอเบอรี่สมูทตี้', category:'นมสด', price:60, recipe:[{matId:'m2',qty:0.12},{matId:'f8',qty:0.04},{matId:'s2',qty:0.02},{matId:'p1',qty:0.3},{matId:'p2',qty:1}] }
+    ],
+    orders: [],
+    pendingOrders: []
+  };
+  save(); renderAll(); toast('โหลดเมนูร้านคุณตุ่น 79 รายการแล้ว');
+}
+
+// ====== CUSTOMER VIEW ======
+let custCart = [];
+function setupCustomerView() {
+  document.body.classList.add('customer-view');
+  // Try to load menu data from URL hash (cross-device case)
+  const hash = location.hash;
+  if (hash.startsWith('#m=')) {
+    try {
+      const payload = decompressFromB64(hash.slice(3));
+      state.shopName = payload.s || state.shopName;
+      state.menus = payload.m.map(arr => ({
+        id: arr[0], name: arr[1], category: arr[2], price: arr[3], recipe: []
+      }));
+    } catch(e) {
+      console.error('ไม่สามารถอ่านข้อมูลเมนูจาก QR:', e);
+    }
+  }
+  document.getElementById('appTitle').textContent = '🍽️ ' + (state.shopName || 'เมนู');
+  document.getElementById('appSubtitle').textContent = 'เลือกเมนูแล้วกดส่งออเดอร์';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  // Build customer UI
+  const main = document.querySelector('main');
+  if (!state.menus.length) {
+    main.innerHTML = `<div class="card" style="text-align:center; padding:30px">
+      <h2 style="margin:0 0 12px">⚠️ ไม่มีเมนูให้แสดง</h2>
+      <p style="color:var(--muted)">QR ที่สแกนไม่มีข้อมูลเมนู หรือยังไม่ได้บันทึกเมนูในร้าน</p>
+      <p style="font-size:13px; color:var(--muted)">กรุณาแจ้งพนักงานสร้าง QR ใหม่</p>
+    </div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div class="toolbar">
+      <input type="search" id="custSearch" placeholder="ค้นหาเมนู..." oninput="renderCustomerMenus()" />
+      <select id="custCat" onchange="renderCustomerMenus()"><option value="">ทุกหมวด</option></select>
+    </div>
+    <div class="pos-menus" id="custMenuGrid"></div>
+    <div id="custCartBox" style="position:sticky; bottom:0; background:white; border-top:2px solid var(--primary); margin:14px -14px -14px; padding:14px; display:none">
+      <h3 style="margin:0 0 8px">🛒 ตะกร้าของคุณ</h3>
+      <div id="custCartItems"></div>
+      <div class="cart-total" style="margin-top:8px">
+        <div class="row big"><span>รวม</span><b id="custTotal">0.00 ฿</b></div>
+      </div>
+      <div class="field" style="margin:8px 0"><input type="text" id="custNote" placeholder="หมายเหตุ เช่น โต๊ะ 5, ไม่ใส่ผัก" /></div>
+      <button class="btn block success" onclick="submitCustomerOrder()">📤 ส่งออเดอร์</button>
+    </div>
+  `;
+  const cats = [...new Set(state.menus.map(m=>m.category).filter(Boolean))];
+  document.getElementById('custCat').innerHTML = '<option value="">ทุกหมวด</option>' + cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  renderCustomerMenus();
+}
+function renderCustomerMenus() {
+  const q = (document.getElementById('custSearch')?.value||'').toLowerCase();
+  const cat = document.getElementById('custCat')?.value||'';
+  const filtered = state.menus.filter(m=>m.name.toLowerCase().includes(q) && (!cat||m.category===cat));
+  const grid = document.getElementById('custMenuGrid');
+  if (!filtered.length) { grid.innerHTML = '<div class="empty">ไม่มีเมนู</div>'; return; }
+  grid.innerHTML = filtered.map(m => {
+    const inCart = custCart.find(c=>c.menuId===m.id);
+    return `<div class="menu-btn" style="display:flex; flex-direction:column; gap:6px">
+      <div class="name">${escapeHtml(m.name)}</div>
+      <div class="cat">${escapeHtml(m.category||'-')}</div>
+      <div class="price">${fmt(m.price)} ฿</div>
+      ${inCart ? `<div class="qty-ctl" style="justify-content:center">
+        <button onclick="custChangeQty('${m.id}',-1)">−</button>
+        <span>${inCart.qty}</span>
+        <button onclick="custChangeQty('${m.id}',1)">+</button>
+      </div>` : `<button class="btn small" onclick="custAdd('${m.id}')">+ เพิ่ม</button>`}
+    </div>`;
+  }).join('');
+  renderCustomerCart();
+}
+function custAdd(id) { custCart.push({ menuId: id, qty: 1 }); renderCustomerMenus(); }
+function custChangeQty(id, d) {
+  const c = custCart.find(x=>x.menuId===id);
+  if (!c) return;
+  c.qty += d;
+  if (c.qty <= 0) custCart = custCart.filter(x=>x.menuId!==id);
+  renderCustomerMenus();
+}
+function renderCustomerCart() {
+  const box = document.getElementById('custCartBox');
+  if (!custCart.length) { box.style.display='none'; return; }
+  box.style.display='block';
+  let total = 0;
+  document.getElementById('custCartItems').innerHTML = custCart.map(c => {
+    const m = state.menus.find(x=>x.id===c.menuId);
+    if (!m) return '';
+    const line = m.price*c.qty; total += line;
+    return `<div class="cart-item"><div>${escapeHtml(m.name)} ×${c.qty}</div><div></div><div>${fmt(line)}</div></div>`;
+  }).join('');
+  document.getElementById('custTotal').textContent = fmt(total) + ' ฿';
+}
+function submitCustomerOrder() {
+  if (!custCart.length) return;
+  // Build order with available data (recipes not in customer view)
+  const items = custCart.map(c => {
+    const m = state.menus.find(x=>x.id===c.menuId);
+    return m ? { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: 0 } : null;
+  }).filter(Boolean);
+  const total = items.reduce((s,it)=>s+it.price*it.qty, 0);
+  const order = {
+    items, total, cost: 0, profit: total,
+    note: document.getElementById('custNote').value.trim(),
+    source: 'customer-self'
+  };
+  // Same-device case: save to pending (owner's tab will see via storage event)
+  try { addPendingOrder({ ...order, id: uid(), timestamp: new Date().toISOString() }); } catch(e) {}
+  // Cross-device case: generate response QR for owner to scan
+  const qrData = JSON.stringify({ type: 'order', order });
+  document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
+  document.getElementById('qrBox').innerHTML = makeQR(qrData, 320);
+  document.getElementById('qrCaption').innerHTML = `<b style="font-size:18px">ยอดรวม ${fmt(total)} ฿</b><br><br>📱 แสดง QR นี้ให้พนักงานสแกน<br><small style="color:var(--muted)">(ถ้าใช้แท็บเล็ตเดียวกับร้าน ออเดอร์ส่งให้แล้ว)</small>`;
+  document.getElementById('qrModal').classList.add('active');
+  custCart = [];
+  setTimeout(()=>renderCustomerMenus(), 500);
+}
+
+// ====== INIT ======
+function renderAll() {
+  if (isCustomerView) { setupCustomerView(); return; }
+  document.getElementById('shopName').value = state.shopName || '';
+  document.getElementById('appTitle').textContent = '🍜 ' + (state.shopName || 'ระบบจัดการสต็อก');
+  renderMaterials();
+  renderMenus();
+  renderDashboard();
+  renderPOS();
+  populateCalcSelect();
+  renderCalc();
+}
+load();
+// Auto-load Khun Tun menu on first run
+if (!isCustomerView && !state.menus.length && !state.materials.length) {
+  loadKhunTun(true);
+} else {
+  renderAll();
+}
+
+// Re-sync when other tabs save (so customer-view tab on same device updates owner POS)
+window.addEventListener('storage', e => {
+  if (e.key === STORAGE_KEY) {
+    load();
+    if (!isCustomerView) { renderDashboard(); if (activeTab==='pos') renderPOS(); }
+  }
+});
+
+document.getElementById('searchMat')?.addEventListener('input', renderMaterials);
+document.getElementById('searchMenu')?.addEventListener('input', renderMenus);
+</script>
+</body>
+</html>
