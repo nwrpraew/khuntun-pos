@@ -7,6 +7,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 <style>
   :root {
     --primary: #ea580c;
@@ -323,6 +326,26 @@
   }
 
   .section-title { font-size: 14px; font-weight: 700; margin: 14px 0 8px; }
+
+  /* Queue cards */
+  .queue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .queue-card {
+    background: white;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .queue-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .queue-card .btn.small { padding: 5px 9px; font-size: 12px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
   /* Customer view */
@@ -380,6 +403,7 @@
       <button class="btn ghost" onclick="openCustomerQR()">📱 QR ลูกค้า</button>
     </div>
     <div id="pendingOrdersBox"></div>
+    <div id="activeQueueBox"></div>
     <div class="pos-layout">
       <div class="pos-menus" id="posMenuGrid"></div>
       <div>
@@ -423,7 +447,7 @@
     <h3 class="section-title">📋 ประวัติออเดอร์</h3>
     <div class="card" style="overflow-x:auto">
       <table class="simple" id="ordersTable">
-        <thead><tr><th>เวลา</th><th>รายการ</th><th class="num">รวม</th><th class="num">กำไร</th><th></th></tr></thead>
+        <thead><tr><th>เวลา</th><th>รายการ</th><th>สถานะ</th><th class="num">รวม</th><th class="num">กำไร</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -478,8 +502,33 @@
       </div>
     </div>
     <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">🌐 เชื่อมต่อข้ามเครื่อง (Firebase)</h3>
+      <p class="hint">ลูกค้าสแกน QR เปิดเมนูบนมือถือตัวเอง → กดส่งออเดอร์ → ขึ้นในคิวร้านอัตโนมัติ (ต้องตั้ง Firebase Realtime Database ฟรีจาก Google)</p>
+      <div id="fbStatus" style="margin:8px 0; padding:8px; border-radius:6px; font-size:13px"></div>
+      <div class="field"><label>apiKey</label><input type="text" id="fbApiKey" placeholder="AIzaSy..." value="AIzaSyDEkrSPdZhJIrwi489Fn7CNluY0Bn7i0LU" /></div>
+      <div class="field"><label>databaseURL</label><input type="text" id="fbDbUrl" placeholder="https://xxxxx-default-rtdb.asia-southeast1.firebasedatabase.app" value="https://khun-tun-pos-default-rtdb.asia-southeast1.firebasedatabase.app" /></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn" onclick="connectFirebase()">🔌 เชื่อมต่อ</button>
+        <button class="btn ghost" onclick="disconnectFirebase()">ตัดการเชื่อมต่อ</button>
+        <button class="btn ghost" onclick="document.getElementById('fbHelp').style.display=document.getElementById('fbHelp').style.display==='none'?'block':'none'">❓ วิธีตั้งค่า</button>
+      </div>
+      <div id="fbHelp" style="display:none; margin-top:10px; padding:10px; background:#f9fafb; border-radius:6px; font-size:13px; line-height:1.7">
+        <b>วิธีตั้งค่า Firebase (~5 นาที ครั้งเดียว):</b>
+        <ol style="padding-left:18px; margin:6px 0">
+          <li>เข้า <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> ล็อกอินด้วย Google</li>
+          <li>กด <b>Add project</b> → ตั้งชื่อ (เช่น <code>khun-tun-pos</code>) → ปิด Analytics → Create</li>
+          <li>ใน sidebar กด <b>Build → Realtime Database</b> → Create Database</li>
+          <li>เลือก location <b>Singapore (asia-southeast1)</b> → Next</li>
+          <li>เลือก <b>Start in test mode</b> → Enable</li>
+          <li>คลิกที่ tab <b>Rules</b> วาง:<br><code style="display:block; padding:6px; background:white; border-radius:4px; margin:4px 0">{ "rules": { ".read": true, ".write": true } }</code>→ Publish</li>
+          <li>กลับไปที่ <b>Project settings</b> (รูปเฟือง ⚙️) → scroll ลง "Your apps" → กด <b>&lt;/&gt;</b> (Web) → ตั้งชื่อ → Register</li>
+          <li>Copy ค่า <code>apiKey</code> และ <code>databaseURL</code> จาก <code>firebaseConfig</code> ที่แสดงขึ้นมา → วางในช่องด้านบน → กด "เชื่อมต่อ"</li>
+        </ol>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px">
       <h3 style="margin:0 0 8px">QR สำหรับลูกค้า</h3>
-      <p class="hint">สร้าง QR เพื่อให้ลูกค้าสแกนเปิดเมนู (ต้องการให้ไฟล์ HTML อยู่บน server หรือบนเดียวกัน)</p>
+      <p class="hint">สร้าง QR เพื่อให้ลูกค้าสแกนเปิดเมนู (เชื่อม Firebase แล้วใช้ข้ามเครื่องได้)</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
         <button class="btn" onclick="openCustomerQR()">📱 แสดง QR ลูกค้า</button>
         <button class="btn ghost" onclick="previewCustomerView()">👁️ ดูตัวอย่าง (ทดสอบ)</button>
@@ -587,6 +636,54 @@
   </div>
 </div>
 
+<div class="modal-bg" id="previewModal">
+  <div class="modal" style="max-width:480px">
+    <h2 id="previewTitle">📝 ตรวจสอบออเดอร์</h2>
+    <div id="previewBody"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('previewModal')">← แก้ไข</button>
+      <button class="btn success" id="previewConfirmBtn" onclick="doConfirmPreview()">✓ ส่งออเดอร์</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="sweetnessModal">
+  <div class="modal" style="max-width:380px">
+    <h2 id="sweetTitle">🥤 เลือกความหวาน</h2>
+    <p class="hint" id="sweetSub" style="margin:0 0 10px">เลือกระดับความหวาน</p>
+    <div id="sweetOptions"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="cancelSweetness()">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="paymentModal">
+  <div class="modal" style="max-width:380px">
+    <h2>💰 เลือกวิธีชำระเงิน</h2>
+    <p class="hint" id="paymentSub" style="margin:0 0 10px"></p>
+    <div style="display:flex; flex-direction:column; gap:8px">
+      <button class="btn block" onclick="selectPayment('cash')">💵 เงินสด</button>
+      <button class="btn block" onclick="selectPayment('transfer')">📲 โอน</button>
+      <button class="btn block" onclick="selectPayment('project6040')">📊 โครงการ 60/40</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('paymentModal')">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="custHistoryModal">
+  <div class="modal" style="max-width:480px">
+    <h2>📋 ออเดอร์ที่ส่งแล้ว</h2>
+    <div id="custHistoryBody"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="clearCustHistory()">ล้างประวัติ</button>
+      <button class="btn secondary" onclick="closeModal('custHistoryModal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -620,6 +717,14 @@ function load() {
   if (v1 && !raw) {
     try { const d = JSON.parse(v1); state.materials = d.materials || []; state.menus = d.menus || []; save(); } catch(e) {}
   }
+  // Migrate legacy orders without status — treat them as paid (already in history)
+  if (Array.isArray(state.orders)) {
+    let migrated = false;
+    state.orders.forEach(o => {
+      if (!o.status) { o.status = 'paid'; migrated = true; }
+    });
+    if (migrated) save();
+  }
 }
 function fmt(n) {
   return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -638,6 +743,46 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ====== SWEETNESS & DRINK HELPERS ======
+const SWEETNESS_OPTIONS = [
+  { id: 'none',     label: 'ไม่หวานเลย',   short: 'ไม่หวาน' },
+  { id: 'very-low', label: 'หวานน้อยมาก',  short: 'หวานน้อยมาก' },
+  { id: 'low',      label: 'หวานน้อย',     short: 'หวานน้อย' },
+  { id: 'normal',   label: 'หวานปกติ',     short: 'หวานปกติ' },
+  { id: 'extra',    label: 'เพิ่มหวาน',    short: 'เพิ่มหวาน' }
+];
+function sweetLabel(id) {
+  const s = SWEETNESS_OPTIONS.find(x=>x.id===id);
+  return s ? s.short : '';
+}
+function isDrinkMenu(m) {
+  if (!m) return false;
+  if (m.noSweet) return false;
+  const cat = m.category || '';
+  return /นม|ชา|กาแฟ|โกโก้|ปั่น|สมูทตี้|smoothie|น้ำ|เครื่องดื่ม|drink|โซดา|ลาเต้|คาปู|มอคค่า|มัทฉะ|เอสเปรส|เอสเพรส|เมนูพิเศษ/i.test(cat);
+}
+let _sweetCB = null;
+function askSweetness(menuId, callback) {
+  const m = state.menus.find(x=>x.id===menuId);
+  if (!m) return callback(null);
+  document.getElementById('sweetTitle').textContent = '🥤 ' + m.name;
+  document.getElementById('sweetSub').textContent = 'เลือกระดับความหวาน';
+  document.getElementById('sweetOptions').innerHTML = SWEETNESS_OPTIONS.map(s =>
+    `<button class="btn block ghost" style="text-align:left; padding:12px; margin-bottom:6px" onclick="pickSweetness('${s.id}')">${s.label}</button>`
+  ).join('');
+  _sweetCB = callback;
+  document.getElementById('sweetnessModal').classList.add('active');
+}
+function pickSweetness(id) {
+  closeModal('sweetnessModal');
+  const cb = _sweetCB; _sweetCB = null;
+  if (cb) cb(id);
+}
+function cancelSweetness() {
+  closeModal('sweetnessModal');
+  _sweetCB = null;
 }
 
 // ====== TABS ======
@@ -823,6 +968,7 @@ function renderPOS() {
   renderPOSMenus();
   renderCart();
   renderPendingOrders();
+  renderActiveQueue();
 }
 function renderPOSMenus() {
   const q = (document.getElementById('posSearch')?.value || '').toLowerCase();
@@ -844,21 +990,32 @@ function renderPOSMenus() {
 function addToCart(menuId, qty=1) {
   const menu = state.menus.find(m=>m.id===menuId);
   if (!menu) { toast('ไม่พบเมนู'); return; }
-  const ex = cart.find(c=>c.menuId===menuId);
-  if (ex) ex.qty += qty;
-  else cart.push({ menuId, qty });
-  renderCart();
-  toast(`+ ${menu.name}`);
+  if (isDrinkMenu(menu)) {
+    askSweetness(menuId, (sw) => addToCartFinal(menuId, qty, sw, menu.name));
+    return;
+  }
+  addToCartFinal(menuId, qty, null, menu.name);
 }
-function changeQty(menuId, delta) {
-  const c = cart.find(x=>x.menuId===menuId);
+function addToCartFinal(menuId, qty, sweetness, displayName) {
+  const ex = cart.find(c => c.menuId===menuId && (c.sweetness||null)===(sweetness||null));
+  if (ex) ex.qty += qty;
+  else cart.push({ menuId, qty, sweetness: sweetness || null });
+  renderCart();
+  const sl = sweetness ? ' (' + sweetLabel(sweetness) + ')' : '';
+  toast(`+ ${displayName||''}${sl}`);
+}
+function cartKey(c) { return c.menuId + '|' + (c.sweetness||''); }
+function changeQty(menuId, sweetness, delta) {
+  const sw = sweetness || null;
+  const c = cart.find(x => x.menuId===menuId && (x.sweetness||null)===sw);
   if (!c) return;
   c.qty += delta;
-  if (c.qty <= 0) cart = cart.filter(x=>x.menuId!==menuId);
+  if (c.qty <= 0) cart = cart.filter(x => !(x.menuId===menuId && (x.sweetness||null)===sw));
   renderCart();
 }
-function removeCartItem(menuId) {
-  cart = cart.filter(x=>x.menuId!==menuId);
+function removeCartItem(menuId, sweetness) {
+  const sw = sweetness || null;
+  cart = cart.filter(x => !(x.menuId===menuId && (x.sweetness||null)===sw));
   renderCart();
 }
 function clearCart() { cart = []; document.getElementById('cartNote').value=''; renderCart(); }
@@ -876,12 +1033,13 @@ function renderCart() {
   itemsBox.innerHTML = cart.map(c => {
     const m = state.menus.find(x=>x.id===c.menuId);
     if (!m) return '';
+    const sw = c.sweetness || '';
     return `<div class="cart-item">
-      <div>${escapeHtml(m.name)}<br><small style="color:var(--muted)">${fmt(m.price)} ฿</small></div>
+      <div>${escapeHtml(m.name)}${sw?` <span class="badge info" style="font-size:10px">${sweetLabel(sw)}</span>`:''}<br><small style="color:var(--muted)">${fmt(m.price)} ฿</small></div>
       <div class="qty-ctl">
-        <button onclick="changeQty('${c.menuId}',-1)">−</button>
+        <button onclick="changeQty('${c.menuId}','${sw}',-1)">−</button>
         <span>${c.qty}</span>
-        <button onclick="changeQty('${c.menuId}',1)">+</button>
+        <button onclick="changeQty('${c.menuId}','${sw}',1)">+</button>
       </div>
       <div style="font-weight:600">${fmt(m.price*c.qty)}</div>
     </div>`;
@@ -899,6 +1057,10 @@ function renderCart() {
 }
 function confirmOrder() {
   if (!cart.length) return;
+  openPreview('pos');
+}
+function actualConfirmOrder() {
+  if (!cart.length) return;
   const order = buildOrder(cart, document.getElementById('cartNote').value.trim(), 'pos');
   deductStock(order);
   state.orders.unshift(order);
@@ -908,6 +1070,79 @@ function confirmOrder() {
   renderPOS();
   renderDashboard();
 }
+
+// ====== ORDER PREVIEW ======
+let pendingPreview = null;
+function openPreview(type) {
+  const titleEl = document.getElementById('previewTitle');
+  const bodyEl = document.getElementById('previewBody');
+  const btnEl = document.getElementById('previewConfirmBtn');
+
+  if (type === 'pos') {
+    if (!cart.length) return;
+    let subtotal = 0, cost = 0;
+    const rows = cart.map(c => {
+      const m = state.menus.find(x=>x.id===c.menuId);
+      if (!m) return '';
+      const line = m.price * c.qty;
+      const lineCost = recipeCost(m) * c.qty;
+      subtotal += line; cost += lineCost;
+      const sw = c.sweetness ? `<br><small style="color:var(--muted)">${sweetLabel(c.sweetness)}</small>` : '';
+      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(m.price)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
+    }).join('');
+    const note = (document.getElementById('cartNote')?.value||'').trim();
+    titleEl.textContent = '📝 ตรวจสอบออเดอร์ก่อนยืนยัน';
+    bodyEl.innerHTML = `
+      <table class="simple" style="margin-bottom:10px">
+        <thead><tr><th>เมนู</th><th style="text-align:center">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="cart-total">
+        <div class="row"><span>ราคารวม</span><b>${fmt(subtotal)} ฿</b></div>
+        <div class="row"><span>ต้นทุน</span><b>${fmt(cost)} ฿</b></div>
+        <div class="row" style="color:var(--success)"><span>กำไร</span><b>${fmt(subtotal-cost)} ฿</b></div>
+        <div class="row big"><span>รวมเรียกเก็บ</span><b>${fmt(subtotal)} ฿</b></div>
+      </div>
+      ${note ? `<div style="margin-top:8px; padding:8px; background:#f9fafb; border-radius:6px"><b>หมายเหตุ:</b> ${escapeHtml(note)}</div>` : ''}
+    `;
+    btnEl.textContent = '✓ ยืนยันออเดอร์';
+    pendingPreview = 'pos';
+  } else if (type === 'customer') {
+    if (!custCart.length) return;
+    let total = 0;
+    const rows = custCart.map(c => {
+      const m = state.menus.find(x=>x.id===c.menuId);
+      if (!m) return '';
+      const line = m.price * c.qty;
+      total += line;
+      const sw = c.sweetness ? `<br><small style="color:var(--muted)">${sweetLabel(c.sweetness)}</small>` : '';
+      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(m.price)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
+    }).join('');
+    const note = (document.getElementById('custNote')?.value||'').trim();
+    titleEl.textContent = '📝 ตรวจสอบก่อนส่ง';
+    bodyEl.innerHTML = `
+      <p class="hint" style="margin:0 0 8px">กรุณาตรวจสอบรายการให้ถูกต้องก่อนส่ง</p>
+      <table class="simple" style="margin-bottom:10px">
+        <thead><tr><th>เมนู</th><th style="text-align:center">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="cart-total">
+        <div class="row big"><span>ยอดรวม</span><b>${fmt(total)} ฿</b></div>
+      </div>
+      ${note ? `<div style="margin-top:8px; padding:8px; background:#f9fafb; border-radius:6px"><b>หมายเหตุ:</b> ${escapeHtml(note)}</div>` : ''}
+    `;
+    btnEl.textContent = '📤 ยืนยันส่งออเดอร์';
+    pendingPreview = 'customer';
+  } else { return; }
+  document.getElementById('previewModal').classList.add('active');
+}
+function doConfirmPreview() {
+  const t = pendingPreview;
+  closeModal('previewModal');
+  pendingPreview = null;
+  if (t === 'pos') actualConfirmOrder();
+  else if (t === 'customer') actualSubmitCustomerOrder();
+}
 function buildOrder(items, note, source) {
   let total=0, cost=0;
   const detailedItems = items.map(c => {
@@ -916,14 +1151,15 @@ function buildOrder(items, note, source) {
     const lineCost = recipeCost(m)*c.qty;
     const lineTotal = m.price*c.qty;
     total += lineTotal; cost += lineCost;
-    return { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: recipeCost(m) };
+    return { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: recipeCost(m), sweetness: c.sweetness || null };
   }).filter(Boolean);
   return {
     id: uid(),
     timestamp: new Date().toISOString(),
     items: detailedItems,
     total, cost, profit: total - cost,
-    note, source
+    note, source,
+    status: 'pending'
   };
 }
 function deductStock(order) {
@@ -948,6 +1184,124 @@ function restoreStock(order) {
 }
 document.getElementById('posSearch')?.addEventListener('input', renderPOSMenus);
 document.getElementById('posCategoryFilter')?.addEventListener('change', renderPOSMenus);
+
+// ====== ACTIVE ORDER QUEUE ======
+const STATUS_LABELS = {
+  pending:   { label: 'รอทำ',       cls: 'warn', emoji: '⏳' },
+  ready:     { label: 'ทำเสร็จแล้ว', cls: 'ok',   emoji: '✓' },
+  delivered: { label: 'จัดส่งแล้ว',  cls: 'info', emoji: '🚚' },
+  paid:      { label: 'ชำระแล้ว',    cls: 'ok',   emoji: '💰' }
+};
+const PAYMENT_LABELS = { cash: 'เงินสด', transfer: 'โอน', project6040: 'โครงการ 60/40' };
+function paymentLabel(m) { return PAYMENT_LABELS[m] || m || '-'; }
+function statusLabel(s) { return (STATUS_LABELS[s] || STATUS_LABELS.pending).label; }
+
+function renderActiveQueue() {
+  const box = document.getElementById('activeQueueBox');
+  if (!box) return;
+  const active = state.orders.filter(o => (o.status || 'pending') !== 'paid');
+  if (!active.length) { box.innerHTML = ''; return; }
+  active.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+  box.innerHTML = `
+    <h3 class="section-title" style="margin-top:0">🔥 คิวออเดอร์ (${active.length})</h3>
+    <div class="queue-grid">
+      ${active.map((o,i) => renderQueueCard(o, i+1)).join('')}
+    </div>
+  `;
+}
+function renderQueueCard(o, num) {
+  const status = o.status || 'pending';
+  const info = STATUS_LABELS[status] || STATUS_LABELS.pending;
+  const borderColor = status==='ready' ? '#16a34a' : status==='delivered' ? '#0ea5e9' : '#facc15';
+  const items = o.items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <span style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</span>':''} ×${it.qty}</div>`).join('');
+  let actions = '';
+  if (status === 'pending') {
+    actions += `<button class="btn small success" onclick="updateOrderStatus('${o.id}','ready')">✓ ทำเสร็จ</button>`;
+    actions += `<button class="btn small" onclick="updateOrderStatus('${o.id}','delivered')">🚚 จัดส่ง</button>`;
+  } else if (status === 'ready') {
+    actions += `<button class="btn small" onclick="updateOrderStatus('${o.id}','delivered')">🚚 จัดส่ง</button>`;
+  }
+  actions += `<button class="btn small success" onclick="openPaymentModal('${o.id}')">💰 ชำระเงิน</button>`;
+  actions += `<button class="btn small ghost" onclick="cancelActiveOrder('${o.id}')">🗑️</button>`;
+  return `
+    <div class="queue-card" style="border:2px solid ${borderColor}">
+      <div class="queue-card-head">
+        <div>
+          <b style="font-size:16px">#${num}</b>
+          <span class="badge ${info.cls}" style="margin-left:6px">${info.emoji} ${info.label}</span>
+        </div>
+        <div class="timer" data-ts="${o.timestamp}" style="font-family:monospace; font-weight:700; font-size:16px">--:--</div>
+      </div>
+      <div style="font-size:13px; margin:6px 0">${items}</div>
+      ${o.note ? `<div style="font-size:12px; color:var(--muted); margin-bottom:4px">📝 ${escapeHtml(o.note)}</div>` : ''}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:6px 0">
+        <div style="font-size:12px; color:var(--muted)">${fmtTime(o.timestamp)}</div>
+        <b>${fmt(o.total)} ฿</b>
+      </div>
+      <div style="display:flex; gap:4px; flex-wrap:wrap">${actions}</div>
+    </div>
+  `;
+}
+function updateOrderStatus(orderId, status) {
+  const o = state.orders.find(x => x.id === orderId);
+  if (!o) return;
+  o.status = status;
+  if (status === 'ready') o.readyAt = new Date().toISOString();
+  if (status === 'delivered') o.deliveredAt = new Date().toISOString();
+  save(); renderActiveQueue(); renderDashboard();
+  toast('อัพเดทสถานะ: ' + statusLabel(status));
+}
+function cancelActiveOrder(orderId) {
+  if (!confirm('ยกเลิกออเดอร์นี้และคืนสต็อก?')) return;
+  const i = state.orders.findIndex(x => x.id === orderId);
+  if (i < 0) return;
+  restoreStock(state.orders[i]);
+  state.orders.splice(i, 1);
+  save(); renderActiveQueue(); renderDashboard(); renderReports();
+  toast('ยกเลิกและคืนสต็อกแล้ว');
+}
+
+// ====== PAYMENT ======
+let currentPaymentOrderId = null;
+function openPaymentModal(orderId) {
+  const o = state.orders.find(x => x.id === orderId);
+  if (!o) return;
+  currentPaymentOrderId = orderId;
+  document.getElementById('paymentSub').textContent = `ยอด ${fmt(o.total)} ฿`;
+  document.getElementById('paymentModal').classList.add('active');
+}
+function selectPayment(method) {
+  if (!currentPaymentOrderId) return;
+  const o = state.orders.find(x => x.id === currentPaymentOrderId);
+  if (!o) return;
+  o.status = 'paid';
+  o.paymentMethod = method;
+  o.paidAt = new Date().toISOString();
+  save();
+  closeModal('paymentModal');
+  currentPaymentOrderId = null;
+  renderActiveQueue(); renderDashboard(); renderReports();
+  toast('ชำระเงินแล้ว (' + paymentLabel(method) + ')');
+}
+
+// ====== TIMERS ======
+function updateTimers() {
+  document.querySelectorAll('.timer[data-ts]').forEach(el => {
+    const ts = new Date(el.getAttribute('data-ts'));
+    if (isNaN(ts.getTime())) { el.textContent = '--:--'; return; }
+    const totalSec = Math.max(0, Math.floor((Date.now() - ts.getTime()) / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    el.textContent = h > 0
+      ? `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
+      : `${m}:${s.toString().padStart(2,'0')}`;
+    if (m >= 15 || h > 0) el.style.color = '#dc2626';
+    else if (m >= 8) el.style.color = '#b45309';
+    else el.style.color = '';
+  });
+}
+setInterval(updateTimers, 1000);
 
 // ====== PENDING ORDERS (from customer view) ======
 function renderPendingOrders() {
@@ -984,13 +1338,18 @@ function acceptPending(idx) {
   p.cost = totalCost;
   p.profit = p.total - totalCost;
   deductStock(p);
-  state.orders.unshift({ ...p, source: p.source || 'customer-qr' });
+  const fbKey = p.fbKey;
+  const { fbKey: _, ...orderClean } = p;
+  state.orders.unshift({ ...orderClean, source: p.source || 'customer-qr', status: 'pending' });
   state.pendingOrders.splice(idx,1);
   save(); renderPOS(); renderDashboard(); toast('ยืนยันออเดอร์แล้ว');
+  if (fbKey) fbRemovePendingOrder(fbKey).catch(()=>{});
 }
 function rejectPending(idx) {
   if (!confirm('ปฏิเสธออเดอร์นี้?')) return;
+  const fbKey = state.pendingOrders[idx]?.fbKey;
   state.pendingOrders.splice(idx,1);
+  if (fbKey) fbRemovePendingOrder(fbKey).catch(()=>{});
   save(); renderPOS();
 }
 function addPendingOrder(p) {
@@ -1032,7 +1391,35 @@ function decompressFromB64(str) {
 }
 
 function openCustomerQR() {
-  // Build minimal menu payload (no recipes — not needed for customer)
+  document.getElementById('qrTitle').textContent = '📱 QR สั่งอาหารสำหรับลูกค้า';
+  // Firebase mode (cross-device) if connected
+  if (fbIsConnected()) {
+    const cfg = fbGetConfig();
+    const shopId = fbGetShopId();
+    // Derive authDomain from databaseURL if not stored (Firebase Realtime DB hosts follow predictable pattern)
+    const m = cfg.databaseURL.match(/^https?:\/\/([^.]+)/);
+    const projectId = m ? m[1].replace(/-default-rtdb$/, '') : 'unused';
+    const authDomain = cfg.authDomain || (projectId + '.firebaseapp.com');
+    const payload = { k: cfg.apiKey, u: cfg.databaseURL, s: shopId, a: authDomain };
+    const data = compressToB64(payload);
+    const url = location.origin + location.pathname + '?view=customer#fb=' + data;
+    document.getElementById('qrBox').innerHTML = '<div style="padding:20px">กำลังอัปโหลดเมนู...</div>';
+    document.getElementById('qrCaption').innerHTML = '';
+    document.getElementById('qrModal').classList.add('active');
+    fbPublishMenu().then(() => {
+      document.getElementById('qrBox').innerHTML = makeQR(url, 360);
+      document.getElementById('qrCaption').innerHTML = `
+        <b style="color:var(--success)">🌐 โหมดข้ามเครื่อง (Firebase)</b><br>
+        ลูกค้าสแกนบนมือถือ → สั่ง → ออเดอร์เข้า POS ทันที<br>
+        <small style="color:var(--muted)">เมนู ${state.menus.length} รายการ — Shop ID: ${shopId}</small><br>
+        <small style="word-break:break-all; font-size:10px; color:var(--muted)">${escapeHtml(url)}</small>`;
+    }).catch(err => {
+      document.getElementById('qrBox').innerHTML = '<div style="padding:20px; color:var(--danger)">❌ อัปโหลดเมนูไม่สำเร็จ</div>';
+      document.getElementById('qrCaption').innerHTML = '<small>' + escapeHtml(err.message||String(err)) + '</small>';
+    });
+    return;
+  }
+  // Fallback: same-device QR (menu embedded in URL)
   const payload = {
     s: state.shopName || 'ร้านอาหาร',
     m: state.menus.map(m => [m.id, m.name, m.category || '', m.price])
@@ -1040,15 +1427,13 @@ function openCustomerQR() {
   const data = compressToB64(payload);
   const url = location.origin + location.pathname + '?view=customer#m=' + data;
   const tooBig = url.length > 2900;
-  document.getElementById('qrTitle').textContent = '📱 QR สั่งอาหารสำหรับลูกค้า';
   if (tooBig) {
-    // Fallback: simple URL without menu data
     const simpleUrl = location.origin + location.pathname + '?view=customer';
     document.getElementById('qrBox').innerHTML = makeQR(simpleUrl);
-    document.getElementById('qrCaption').innerHTML = `<b style="color:var(--warning)">⚠️ เมนูเยอะเกินใส่ใน QR</b><br>QR นี้ใช้ได้เฉพาะอุปกรณ์เดียวกันที่มีข้อมูลแล้ว<br><small style="word-break:break-all; font-size:10px">${escapeHtml(simpleUrl)}</small>`;
+    document.getElementById('qrCaption').innerHTML = `<b style="color:#b45309">⚠️ เมนูเยอะเกินใส่ใน QR</b><br>QR นี้ใช้ได้เฉพาะอุปกรณ์เดียวกันที่มีข้อมูลแล้ว<br><small style="color:var(--muted)">💡 เชื่อม Firebase เพื่อใช้ข้ามเครื่อง (ดูที่ตั้งค่า)</small>`;
   } else {
     document.getElementById('qrBox').innerHTML = makeQR(url, 360);
-    document.getElementById('qrCaption').innerHTML = `ลูกค้าสแกน → เห็นเมนู ${state.menus.length} รายการในมือถือ → สั่ง<br><small style="color:var(--muted)">ลูกค้าสั่งเสร็จ จะได้ QR ตอบกลับ ให้พนักงานสแกนยืนยันออเดอร์</small><br><br><b style="color:var(--info)">📌 ต้องอัปโหลดไฟล์ขึ้น web hosting</b> (ฟรี: GitHub Pages, Netlify) ลูกค้าจึงสแกนได้`;
+    document.getElementById('qrCaption').innerHTML = `<b style="color:#b45309">📍 โหมดเครื่องเดียว (localStorage)</b><br>ลูกค้าสแกน → เห็นเมนู → สั่ง (ต้องใช้แท็บเล็ตเครื่องเดียวกับร้าน)<br><br><small style="color:var(--muted)">💡 เชื่อม Firebase เพื่อให้ลูกค้าสั่งจากมือถือตัวเองข้ามเครื่องได้</small>`;
   }
   document.getElementById('qrModal').classList.add('active');
 }
@@ -1203,26 +1588,33 @@ function renderTopSellers(orders) {
 }
 function renderOrdersTable(orders) {
   const tbody = document.querySelector('#ordersTable tbody');
-  if (!orders.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted)">ยังไม่มีออเดอร์</td></tr>'; return; }
-  tbody.innerHTML = orders.slice(0, 100).map(o => `
+  if (!orders.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted)">ยังไม่มีออเดอร์</td></tr>'; return; }
+  tbody.innerHTML = orders.slice(0, 100).map(o => {
+    const st = STATUS_LABELS[o.status||'pending'] || STATUS_LABELS.pending;
+    const pay = o.paymentMethod ? '<br><small style="color:var(--muted)">'+paymentLabel(o.paymentMethod)+'</small>' : '';
+    return `
     <tr>
       <td>${fmtTime(o.timestamp)}</td>
-      <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}${o.note?'<br><small style="color:var(--muted)">'+escapeHtml(o.note)+'</small>':''}</td>
+      <td>${o.items.map(it=>escapeHtml(it.name)+(it.sweetness?' ('+sweetLabel(it.sweetness)+')':'')+' ×'+it.qty).join(', ')}${o.note?'<br><small style="color:var(--muted)">'+escapeHtml(o.note)+'</small>':''}</td>
+      <td><span class="badge ${st.cls}">${st.emoji} ${st.label}</span>${pay}</td>
       <td class="num">${fmt(o.total)}</td>
       <td class="num" style="color:${o.profit>=0?'var(--success)':'var(--danger)'}">${fmt(o.profit)}</td>
       <td class="actions-cell"><button class="btn small ghost" onclick="viewOrder('${o.id}')">ดู</button></td>
     </tr>
-  `).join('');
+  `;}).join('');
 }
 function viewOrder(id) {
   const o = state.orders.find(x=>x.id===id);
   if (!o) return;
   viewingOrderId = id;
+  const st = STATUS_LABELS[o.status||'pending'] || STATUS_LABELS.pending;
+  const payLine = o.paymentMethod ? ` • ${paymentLabel(o.paymentMethod)}` : '';
   document.getElementById('orderDetailBody').innerHTML = `
     <div class="hint">${fmtTime(o.timestamp)} • ${o.source||'pos'}${o.note?' • '+escapeHtml(o.note):''}</div>
+    <div style="margin:6px 0"><span class="badge ${st.cls}">${st.emoji} ${st.label}</span>${payLine}</div>
     <table class="simple" style="margin-top:8px">
       <thead><tr><th>เมนู</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th></tr></thead>
-      <tbody>${o.items.map(it=>`<tr><td>${escapeHtml(it.name)}</td><td class="num">${it.qty}</td><td class="num">${fmt(it.price)}</td><td class="num">${fmt(it.price*it.qty)}</td></tr>`).join('')}</tbody>
+      <tbody>${o.items.map(it=>`<tr><td>${escapeHtml(it.name)}${it.sweetness?'<br><small style="color:var(--muted)">'+sweetLabel(it.sweetness)+'</small>':''}</td><td class="num">${it.qty}</td><td class="num">${fmt(it.price)}</td><td class="num">${fmt(it.price*it.qty)}</td></tr>`).join('')}</tbody>
       <tfoot>
         <tr><th colspan="3">ยอดขาย</th><th class="num">${fmt(o.total)}</th></tr>
         <tr><th colspan="3">ต้นทุน</th><th class="num">${fmt(o.cost)}</th></tr>
@@ -1494,10 +1886,42 @@ function loadKhunTun(force) {
 
 // ====== CUSTOMER VIEW ======
 let custCart = [];
+let custFbShopId = null; // when set, customer is in Firebase cross-device mode
 function setupCustomerView() {
   document.body.classList.add('customer-view');
-  // Try to load menu data from URL hash (cross-device case)
+  document.getElementById('appTitle').textContent = '🍽️ กำลังโหลด...';
+  document.getElementById('appSubtitle').textContent = '';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   const hash = location.hash;
+
+  // Mode 1: Firebase cross-device  (#fb=...)
+  if (hash.startsWith('#fb=')) {
+    try {
+      const payload = decompressFromB64(hash.slice(4));
+      custFbShopId = payload.s;
+      initFirebase({ apiKey: payload.k, databaseURL: payload.u, authDomain: payload.a });
+      fbEnsureAuth().then(() =>
+        fbDb.ref(`shops/${custFbShopId}/menu`).once('value')
+      ).then(snap => {
+        const data = snap.val();
+        if (!data || !Array.isArray(data.menus) || !data.menus.length) {
+          showCustomerError('ยังไม่มีเมนูในระบบ ทางร้านยังไม่ได้กด "QR ลูกค้า"');
+          return;
+        }
+        state.shopName = data.shopName || 'ร้าน';
+        state.menus = data.menus.map(m => ({ ...m, recipe: [] }));
+        buildCustomerUI();
+      }).catch(err => {
+        showCustomerError('โหลดเมนูไม่ได้: ' + (err.message||String(err)));
+      });
+      return;
+    } catch(e) {
+      showCustomerError('ลิงก์ไม่ถูกต้อง: ' + e.message);
+      return;
+    }
+  }
+
+  // Mode 2: Same-device QR (#m=...)
   if (hash.startsWith('#m=')) {
     try {
       const payload = decompressFromB64(hash.slice(3));
@@ -1509,10 +1933,20 @@ function setupCustomerView() {
       console.error('ไม่สามารถอ่านข้อมูลเมนูจาก QR:', e);
     }
   }
+
+  // Mode 3 / fallback: localStorage
+  buildCustomerUI();
+}
+function showCustomerError(msg) {
+  document.getElementById('appTitle').textContent = '🍽️ ไม่พร้อมใช้งาน';
+  document.querySelector('main').innerHTML = `<div class="card" style="text-align:center; padding:30px">
+    <h2 style="margin:0 0 12px">⚠️ ${escapeHtml(msg)}</h2>
+    <p style="font-size:13px; color:var(--muted)">กรุณาแจ้งพนักงานสร้าง QR ใหม่</p>
+  </div>`;
+}
+function buildCustomerUI() {
   document.getElementById('appTitle').textContent = '🍽️ ' + (state.shopName || 'เมนู');
   document.getElementById('appSubtitle').textContent = 'เลือกเมนูแล้วกดส่งออเดอร์';
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  // Build customer UI
   const main = document.querySelector('main');
   if (!state.menus.length) {
     main.innerHTML = `<div class="card" style="text-align:center; padding:30px">
@@ -1523,6 +1957,11 @@ function setupCustomerView() {
     return;
   }
   main.innerHTML = `
+    <div style="display:flex; justify-content:flex-end; margin-bottom:8px">
+      <button id="custHistoryBtn" class="btn small ghost" onclick="openCustHistory()" style="display:none; align-items:center; gap:4px">
+        📋 ประวัติของฉัน <span class="badge info" id="custHistoryCount">0</span>
+      </button>
+    </div>
     <div class="toolbar">
       <input type="search" id="custSearch" placeholder="ค้นหาเมนู..." oninput="renderCustomerMenus()" />
       <select id="custCat" onchange="renderCustomerMenus()"><option value="">ทุกหมวด</option></select>
@@ -1541,6 +1980,7 @@ function setupCustomerView() {
   const cats = [...new Set(state.menus.map(m=>m.category).filter(Boolean))];
   document.getElementById('custCat').innerHTML = '<option value="">ทุกหมวด</option>' + cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   renderCustomerMenus();
+  updateCustHistoryBtn();
 }
 function renderCustomerMenus() {
   const q = (document.getElementById('custSearch')?.value||'').toLowerCase();
@@ -1549,26 +1989,37 @@ function renderCustomerMenus() {
   const grid = document.getElementById('custMenuGrid');
   if (!filtered.length) { grid.innerHTML = '<div class="empty">ไม่มีเมนู</div>'; return; }
   grid.innerHTML = filtered.map(m => {
-    const inCart = custCart.find(c=>c.menuId===m.id);
+    const totalInCart = custCart.filter(c=>c.menuId===m.id).reduce((s,c)=>s+c.qty,0);
     return `<div class="menu-btn" style="display:flex; flex-direction:column; gap:6px">
       <div class="name">${escapeHtml(m.name)}</div>
       <div class="cat">${escapeHtml(m.category||'-')}</div>
       <div class="price">${fmt(m.price)} ฿</div>
-      ${inCart ? `<div class="qty-ctl" style="justify-content:center">
-        <button onclick="custChangeQty('${m.id}',-1)">−</button>
-        <span>${inCart.qty}</span>
-        <button onclick="custChangeQty('${m.id}',1)">+</button>
-      </div>` : `<button class="btn small" onclick="custAdd('${m.id}')">+ เพิ่ม</button>`}
+      <button class="btn small" onclick="custAdd('${m.id}')">+ เพิ่ม${totalInCart?` (×${totalInCart})`:''}</button>
     </div>`;
   }).join('');
   renderCustomerCart();
 }
-function custAdd(id) { custCart.push({ menuId: id, qty: 1 }); renderCustomerMenus(); }
-function custChangeQty(id, d) {
-  const c = custCart.find(x=>x.menuId===id);
+function custAdd(id) {
+  const m = state.menus.find(x=>x.id===id);
+  if (!m) return;
+  if (isDrinkMenu(m)) {
+    askSweetness(id, (sw) => custAddFinal(id, sw));
+    return;
+  }
+  custAddFinal(id, null);
+}
+function custAddFinal(id, sw) {
+  const ex = custCart.find(x=>x.menuId===id && (x.sweetness||null)===(sw||null));
+  if (ex) ex.qty += 1;
+  else custCart.push({ menuId: id, qty: 1, sweetness: sw || null });
+  renderCustomerMenus();
+}
+function custChangeQty(id, sweetness, d) {
+  const sw = sweetness || null;
+  const c = custCart.find(x=>x.menuId===id && (x.sweetness||null)===sw);
   if (!c) return;
   c.qty += d;
-  if (c.qty <= 0) custCart = custCart.filter(x=>x.menuId!==id);
+  if (c.qty <= 0) custCart = custCart.filter(x=>!(x.menuId===id && (x.sweetness||null)===sw));
   renderCustomerMenus();
 }
 function renderCustomerCart() {
@@ -1580,16 +2031,29 @@ function renderCustomerCart() {
     const m = state.menus.find(x=>x.id===c.menuId);
     if (!m) return '';
     const line = m.price*c.qty; total += line;
-    return `<div class="cart-item"><div>${escapeHtml(m.name)} ×${c.qty}</div><div></div><div>${fmt(line)}</div></div>`;
+    const sw = c.sweetness || '';
+    return `<div class="cart-item">
+      <div>${escapeHtml(m.name)}${sw?` <span class="badge info" style="font-size:10px">${sweetLabel(sw)}</span>`:''}</div>
+      <div class="qty-ctl">
+        <button onclick="custChangeQty('${c.menuId}','${sw}',-1)">−</button>
+        <span>${c.qty}</span>
+        <button onclick="custChangeQty('${c.menuId}','${sw}',1)">+</button>
+      </div>
+      <div style="font-weight:600">${fmt(line)}</div>
+    </div>`;
   }).join('');
   document.getElementById('custTotal').textContent = fmt(total) + ' ฿';
 }
 function submitCustomerOrder() {
   if (!custCart.length) return;
+  openPreview('customer');
+}
+function actualSubmitCustomerOrder() {
+  if (!custCart.length) return;
   // Build order with available data (recipes not in customer view)
   const items = custCart.map(c => {
     const m = state.menus.find(x=>x.id===c.menuId);
-    return m ? { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: 0 } : null;
+    return m ? { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: 0, sweetness: c.sweetness || null } : null;
   }).filter(Boolean);
   const total = items.reduce((s,it)=>s+it.price*it.qty, 0);
   const order = {
@@ -1597,16 +2061,281 @@ function submitCustomerOrder() {
     note: document.getElementById('custNote').value.trim(),
     source: 'customer-self'
   };
-  // Same-device case: save to pending (owner's tab will see via storage event)
-  try { addPendingOrder({ ...order, id: uid(), timestamp: new Date().toISOString() }); } catch(e) {}
-  // Cross-device case: generate response QR for owner to scan
-  const qrData = JSON.stringify({ type: 'order', order });
-  document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
-  document.getElementById('qrBox').innerHTML = makeQR(qrData, 320);
-  document.getElementById('qrCaption').innerHTML = `<b style="font-size:18px">ยอดรวม ${fmt(total)} ฿</b><br><br>📱 แสดง QR นี้ให้พนักงานสแกน<br><small style="color:var(--muted)">(ถ้าใช้แท็บเล็ตเดียวกับร้าน ออเดอร์ส่งให้แล้ว)</small>`;
-  document.getElementById('qrModal').classList.add('active');
-  custCart = [];
-  setTimeout(()=>renderCustomerMenus(), 500);
+  const fullOrder = { ...order, id: uid(), timestamp: new Date().toISOString(), status: 'pending' };
+  saveCustHistory(fullOrder);
+  const finishSuccess = (mode) => {
+    const itemsHtml = items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <small style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</small>':''} ×${it.qty}</div>`).join('');
+    document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
+    document.getElementById('qrBox').innerHTML = `
+      <div style="font-size:48px; margin:10px 0">🎉</div>
+      <div style="text-align:left; font-size:13px; padding:0 10px">${itemsHtml}</div>
+      ${order.note ? `<div style="margin-top:8px; padding:8px; background:#f9fafb; border-radius:6px; font-size:12px"><b>หมายเหตุ:</b> ${escapeHtml(order.note)}</div>` : ''}
+    `;
+    document.getElementById('qrCaption').innerHTML = `<b style="font-size:20px; color:var(--success)">ยอดรวม ${fmt(total)} ฿</b><br><br>🍳 ทางร้านได้รับออเดอร์แล้ว กรุณารอสักครู่<br><small style="color:var(--muted)">${mode==='fb'?'(ส่งผ่าน Firebase)':''} กดปุ่ม "ประวัติของฉัน" เพื่อดูออเดอร์เก่า</small>`;
+    document.getElementById('qrModal').classList.add('active');
+    custCart = [];
+    document.getElementById('custNote').value = '';
+    setTimeout(()=>{ renderCustomerMenus(); updateCustHistoryBtn(); }, 300);
+  };
+  if (custFbShopId && fbIsConnected()) {
+    // Cross-device via Firebase
+    fbPushCustomerOrder(custFbShopId, fullOrder)
+      .then(() => finishSuccess('fb'))
+      .catch(err => {
+        toast('❌ ส่งไม่สำเร็จ: ' + (err.message||err));
+      });
+  } else {
+    // Same-device via localStorage (storage event picks it up)
+    try { addPendingOrder(fullOrder); } catch(e) {}
+    finishSuccess('local');
+  }
+}
+
+// ====== CUSTOMER ORDER HISTORY (local, per device) ======
+const CUST_HISTORY_KEY = 'custOrderHistory_v1';
+function loadCustHistory() {
+  try { return JSON.parse(localStorage.getItem(CUST_HISTORY_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveCustHistory(order) {
+  const h = loadCustHistory();
+  h.unshift(order);
+  // keep last 50
+  localStorage.setItem(CUST_HISTORY_KEY, JSON.stringify(h.slice(0, 50)));
+}
+function clearCustHistory() {
+  if (!confirm('ล้างประวัติออเดอร์ของคุณ?')) return;
+  localStorage.removeItem(CUST_HISTORY_KEY);
+  renderCustHistoryModal();
+  updateCustHistoryBtn();
+}
+function updateCustHistoryBtn() {
+  const btn = document.getElementById('custHistoryBtn');
+  if (!btn) return;
+  const h = loadCustHistory();
+  btn.style.display = h.length ? 'inline-flex' : 'none';
+  const countEl = document.getElementById('custHistoryCount');
+  if (countEl) countEl.textContent = h.length;
+}
+function openCustHistory() {
+  renderCustHistoryModal();
+  document.getElementById('custHistoryModal').classList.add('active');
+}
+function renderCustHistoryModal() {
+  const h = loadCustHistory();
+  const body = document.getElementById('custHistoryBody');
+  if (!h.length) {
+    body.innerHTML = '<div class="empty">ยังไม่มีประวัติ</div>';
+    return;
+  }
+  body.innerHTML = h.map(o => `
+    <div style="border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:8px">
+      <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px">
+        <span>${fmtTime(o.timestamp)}</span>
+        <b style="color:var(--primary); font-size:14px">${fmt(o.total)} ฿</b>
+      </div>
+      <div style="font-size:13px">
+        ${o.items.map(it => `<div>• ${escapeHtml(it.name)} ×${it.qty} <span style="color:var(--muted)">(${fmt(it.price*it.qty)} ฿)</span></div>`).join('')}
+      </div>
+      ${o.note ? `<div style="margin-top:6px; font-size:12px; color:var(--muted)"><b>หมายเหตุ:</b> ${escapeHtml(o.note)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ====== FIREBASE (cross-device sync) ======
+const FB_CONFIG_KEY = 'fbConfig_v1';
+const FB_SHOPID_KEY = 'fbShopId_v1';
+let fbApp = null;
+let fbDb = null;
+let fbPendingRef = null;
+let fbPendingListener = null;
+let fbSeenOrderIds = new Set();
+
+function fbGetConfig() {
+  try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); } catch(e) { return null; }
+}
+function fbSaveConfig(cfg) {
+  if (!cfg) localStorage.removeItem(FB_CONFIG_KEY);
+  else localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
+}
+function fbGetShopId() {
+  let id = localStorage.getItem(FB_SHOPID_KEY);
+  if (!id) {
+    id = 'shop' + Math.random().toString(36).slice(2,10);
+    localStorage.setItem(FB_SHOPID_KEY, id);
+  }
+  return id;
+}
+function setFbStatus(msg, ok) {
+  const el = document.getElementById('fbStatus');
+  if (!el) return;
+  if (!msg) { el.innerHTML = '<span style="color:var(--muted)">ยังไม่ได้เชื่อมต่อ</span>'; el.style.background = '#f9fafb'; return; }
+  el.innerHTML = msg;
+  el.style.background = ok ? '#dcfce7' : '#fef2f2';
+  el.style.color = ok ? '#15803d' : '#991b1b';
+}
+function fbIsConnected() { return !!(fbApp && fbDb); }
+
+function initFirebase(config) {
+  if (!window.firebase) throw new Error('Firebase SDK ไม่โหลด');
+  if (!config || !config.apiKey || !config.databaseURL) throw new Error('config ไม่ครบ');
+  // Reuse if already initialized with same config
+  if (fbApp) {
+    const opts = fbApp.options;
+    if (opts.apiKey === config.apiKey && opts.databaseURL === config.databaseURL) {
+      return fbApp;
+    }
+    fbApp.delete().catch(()=>{});
+    fbApp = null;
+  }
+  // Derive authDomain from databaseURL when not explicitly provided
+  let authDomain = config.authDomain;
+  if (!authDomain && config.databaseURL) {
+    const m = config.databaseURL.match(/^https?:\/\/([^.]+)/);
+    if (m) authDomain = m[1].replace(/-default-rtdb$/, '') + '.firebaseapp.com';
+  }
+  fbApp = firebase.initializeApp({
+    apiKey: config.apiKey,
+    databaseURL: config.databaseURL,
+    authDomain: authDomain,
+    projectId: config.projectId || (authDomain ? authDomain.replace(/\.firebaseapp\.com$/, '') : 'unused')
+  });
+  fbDb = firebase.database(fbApp);
+  return fbApp;
+}
+// Sign in anonymously and return the user. Caches via auth().currentUser.
+function fbEnsureAuth() {
+  if (!fbApp) return Promise.reject(new Error('Firebase ยังไม่ init'));
+  const auth = firebase.auth(fbApp);
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return auth.signInAnonymously().then(cred => cred.user);
+}
+
+function connectFirebase() {
+  const apiKey = document.getElementById('fbApiKey').value.trim();
+  const databaseURL = document.getElementById('fbDbUrl').value.trim();
+  if (!apiKey || !databaseURL) { setFbStatus('⚠️ กรอก apiKey และ databaseURL ก่อน', false); return; }
+  try {
+    initFirebase({ apiKey, databaseURL });
+    fbSaveConfig({ apiKey, databaseURL });
+    const shopId = fbGetShopId();
+    setFbStatus('🔐 กำลังยืนยันตัวตน...', true);
+    fbEnsureAuth()
+      .then(user => {
+        // Claim ownership if not yet claimed
+        const ownerRef = fbDb.ref(`shops/${shopId}/_ownerUid`);
+        return ownerRef.once('value').then(snap => {
+          const existing = snap.val();
+          if (!existing) {
+            return ownerRef.set(user.uid).then(() => ({ user, claimed: true }));
+          }
+          if (existing !== user.uid) {
+            throw new Error('ร้านนี้ถูกผูกกับเครื่องอื่นแล้ว ใช้ Shop ID อื่นหรือล้าง _ownerUid ใน Firebase Console');
+          }
+          return { user, claimed: false };
+        });
+      })
+      .then(({ user, claimed }) => {
+        return fbDb.ref(`shops/${shopId}/_meta`).set({ shopName: state.shopName || '', updatedAt: Date.now() })
+          .then(() => ({ user, claimed }));
+      })
+      .then(({ user, claimed }) => {
+        setFbStatus(`✅ เชื่อมต่อแล้ว — Shop ID: <code>${shopId}</code><br><small>UID: <code>${user.uid.slice(0,12)}…</code>${claimed?' (ผูกร้านนี้แล้ว)':''}</small>`, true);
+        fbStartSync();
+        toast('เชื่อมต่อ Firebase สำเร็จ');
+      })
+      .catch(err => {
+        setFbStatus('❌ ' + (err.message||err) + '<br><small>ถ้าเชื่อมไม่ได้: เช็คว่าเปิด Anonymous Auth + Rules ถูกต้อง</small>', false);
+      });
+  } catch(e) {
+    setFbStatus('❌ ' + e.message, false);
+  }
+}
+function disconnectFirebase() {
+  if (!confirm('ตัดการเชื่อมต่อ Firebase?')) return;
+  fbStopSync();
+  if (fbApp) { try { fbApp.delete(); } catch(e){} fbApp = null; fbDb = null; }
+  fbSaveConfig(null);
+  document.getElementById('fbApiKey').value = '';
+  document.getElementById('fbDbUrl').value = '';
+  setFbStatus('');
+  toast('ตัดการเชื่อมต่อแล้ว');
+}
+
+function fbStartSync() {
+  if (!fbIsConnected() || isCustomerView) return;
+  const shopId = fbGetShopId();
+  fbStopSync();
+  fbEnsureAuth().then(() => {
+    fbPendingRef = fbDb.ref(`shops/${shopId}/pendingOrders`);
+    fbPendingListener = fbPendingRef.on('child_added', snap => {
+      const order = snap.val();
+      if (!order) return;
+      const orderId = order.id || snap.key;
+      if (fbSeenOrderIds.has(orderId)) return;
+      fbSeenOrderIds.add(orderId);
+      if (state.pendingOrders.some(p => p.id === orderId)) return;
+      addPendingOrder({ ...order, id: orderId, fbKey: snap.key });
+      if (!isCustomerView) {
+        renderDashboard();
+        if (activeTab === 'pos') renderPOS();
+      }
+      toast('🔔 มีออเดอร์ใหม่จากลูกค้า');
+    });
+  }).catch(err => console.error('fbStartSync auth failed', err));
+}
+function fbStopSync() {
+  if (fbPendingRef && fbPendingListener) {
+    fbPendingRef.off('child_added', fbPendingListener);
+  }
+  fbPendingRef = null;
+  fbPendingListener = null;
+  fbSeenOrderIds.clear();
+}
+
+// Customer-side: push order to Firebase (requires auth)
+function fbPushCustomerOrder(shopId, order) {
+  if (!fbIsConnected()) return Promise.reject(new Error('Firebase ไม่ได้เชื่อมต่อ'));
+  return fbEnsureAuth().then(() => fbDb.ref(`shops/${shopId}/pendingOrders`).push(order));
+}
+// Shop-side: remove order from Firebase after accepting/rejecting
+function fbRemovePendingOrder(fbKey) {
+  if (!fbIsConnected() || !fbKey) return Promise.resolve();
+  const shopId = fbGetShopId();
+  return fbEnsureAuth().then(() => fbDb.ref(`shops/${shopId}/pendingOrders/${fbKey}`).remove());
+}
+// Publish menu (called when generating customer QR) — requires owner auth
+function fbPublishMenu() {
+  if (!fbIsConnected()) return Promise.resolve();
+  const shopId = fbGetShopId();
+  const payload = {
+    shopName: state.shopName || 'ร้านอาหาร',
+    menus: state.menus.map(m => ({ id: m.id, name: m.name, category: m.category||'', price: m.price })),
+    updatedAt: Date.now()
+  };
+  return fbEnsureAuth().then(() => fbDb.ref(`shops/${shopId}/menu`).set(payload));
+}
+
+function fbRestoreFromStorage() {
+  const cfg = fbGetConfig();
+  if (!cfg || !cfg.apiKey || !cfg.databaseURL) {
+    setFbStatus('');
+    return;
+  }
+  document.getElementById('fbApiKey').value = cfg.apiKey;
+  document.getElementById('fbDbUrl').value = cfg.databaseURL;
+  try {
+    initFirebase(cfg);
+    const shopId = fbGetShopId();
+    setFbStatus('🔐 กำลังยืนยันตัวตน...', true);
+    fbEnsureAuth().then(user => {
+      setFbStatus(`✅ เชื่อมต่อแล้ว — Shop ID: <code>${shopId}</code><br><small>UID: <code>${user.uid.slice(0,12)}…</code></small>`, true);
+      fbStartSync();
+    }).catch(err => {
+      setFbStatus('⚠️ Auth ล้มเหลว: ' + (err.message||err), false);
+    });
+  } catch(e) {
+    setFbStatus('⚠️ Restore ไม่ได้: ' + e.message, false);
+  }
 }
 
 // ====== INIT ======
@@ -1620,6 +2349,7 @@ function renderAll() {
   renderPOS();
   populateCalcSelect();
   renderCalc();
+  fbRestoreFromStorage();
 }
 load();
 // Auto-load Khun Tun menu on first run
