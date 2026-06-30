@@ -907,7 +907,8 @@ function notifyLine(type, order) {
         secret: s.secret,
         type: type,
         status: order && order.status,
-        order: order
+        order: order,
+        shopId: fbGetShopId()  // ฝัง shopId เพื่อให้ปุ่มในการ์ดเขียน Firebase กลับมาได้
       })
     }).catch(()=>{});
   } catch (e) { /* silent */ }
@@ -2483,6 +2484,9 @@ let fbDb = null;
 let fbPendingRef = null;
 let fbPendingListener = null;
 let fbSeenOrderIds = new Set();
+let fbActionsRef = null;
+let fbActionsAddedListener = null;
+let fbActionsChangedListener = null;
 
 function fbGetConfig() {
   try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); } catch(e) { return null; }
@@ -2625,6 +2629,11 @@ function fbStartSync() {
       }
       toast('🔔 มีออเดอร์ใหม่จากลูกค้า');
     });
+
+    // ฟัง action จากปุ่มในการ์ด LINE ฝั่งร้าน (อัปเดตสถานะ/ชำระเงิน)
+    fbActionsRef = fbDb.ref(`shops/${shopId}/lineActions`);
+    fbActionsAddedListener = fbActionsRef.on('child_added', snap => applyLineAction(snap.key, snap.val(), snap.ref));
+    fbActionsChangedListener = fbActionsRef.on('child_changed', snap => applyLineAction(snap.key, snap.val(), snap.ref));
   }).catch(err => console.error('fbStartSync auth failed', err));
 }
 function fbStopSync() {
@@ -2634,6 +2643,51 @@ function fbStopSync() {
   fbPendingRef = null;
   fbPendingListener = null;
   fbSeenOrderIds.clear();
+
+  if (fbActionsRef) {
+    if (fbActionsAddedListener) fbActionsRef.off('child_added', fbActionsAddedListener);
+    if (fbActionsChangedListener) fbActionsRef.off('child_changed', fbActionsChangedListener);
+  }
+  fbActionsRef = null;
+  fbActionsAddedListener = null;
+  fbActionsChangedListener = null;
+}
+
+// รับ action จาก LINE (ปุ่มในการ์ด) แล้วอัปเดตออเดอร์ใน POS ตามนั้น
+function applyLineAction(code, data, snapRef) {
+  if (!code || !data || !data.status) return;
+  const upper = String(code).toUpperCase();
+  const o = state.orders.find(x => ((x.id || '').slice(-6).toUpperCase() === upper));
+  if (!o) {
+    // ออเดอร์ไม่อยู่ใน state — ลบ action ทิ้งเพื่อไม่ให้ค้าง
+    if (snapRef) snapRef.remove().catch(()=>{});
+    return;
+  }
+  if (o.status === data.status && (data.status !== 'paid' || o.paymentMethod === data.paymentMethod)) {
+    if (snapRef) snapRef.remove().catch(()=>{});
+    return; // ไม่มีอะไรเปลี่ยน
+  }
+
+  const newStatus = data.status;
+  o.status = newStatus;
+  const now = new Date().toISOString();
+  if (newStatus === 'ready')     o.readyAt = now;
+  if (newStatus === 'delivered') o.deliveredAt = now;
+  if (newStatus === 'paid') {
+    o.paymentMethod = data.paymentMethod || o.paymentMethod || 'cash';
+    o.paidAt = now;
+  }
+  save();
+  renderActiveQueue(); renderDashboard(); renderReports();
+
+  // ส่ง notify ให้ลูกค้าทราบสถานะใหม่ (เฉพาะ ready/delivered — ไม่ต้องส่ง paid เพราะ
+  // ทางร้านเพิ่งกดในไลน์เองอยู่แล้ว และเลี่ยงการ push ซ้ำเข้าห้องร้าน)
+  if (newStatus !== 'paid') notifyLine('status_update', o);
+
+  toast('🛎️ จาก LINE: #' + upper + ' → ' + statusLabel(newStatus));
+
+  // เคลียร์ action ออกจาก Firebase กันรันซ้ำตอนเปิดเว็บใหม่
+  if (snapRef) snapRef.remove().catch(()=>{});
 }
 
 // Customer-side: push order to Firebase (requires auth)
