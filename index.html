@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ระบบจัดการสต็อก & คำนวณต้นทุน</title>
+<title>ระบบจัดการสต็อก & คำนวณต้นทุน - POS สำหรับร้านอาหาร/คาเฟ่</title>
+<meta name="description" content="ระบบ POS ออนไลน์สำหรับร้านอาหาร คาเฟ่ ปังปิ้ง — จัดการสต็อก คำนวณต้นทุน-กำไร รับออเดอร์ผ่าน QR แจ้งเตือนผ่าน LINE OA ใช้งานฟรี" />
+<meta name="theme-color" content="#ea580c" />
+<meta name="robots" content="index, follow" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="ระบบจัดการสต็อก & คำนวณต้นทุน" />
+<meta property="og:description" content="ระบบ POS สำหรับร้านอาหาร/คาเฟ่ — สต็อก ต้นทุน QR สั่ง LINE แจ้งเตือน" />
+<meta property="og:locale" content="th_TH" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23ea580c'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='white' font-family='Arial'%3E%F0%9F%9B%92%3C/text%3E%3C/svg%3E" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -522,8 +531,8 @@
       <h3 style="margin:0 0 8px">🌐 เชื่อมต่อข้ามเครื่อง (Firebase)</h3>
       <p class="hint">ลูกค้าสแกน QR เปิดเมนูบนมือถือตัวเอง → กดส่งออเดอร์ → ขึ้นในคิวร้านอัตโนมัติ (ต้องตั้ง Firebase Realtime Database ฟรีจาก Google)</p>
       <div id="fbStatus" style="margin:8px 0; padding:8px; border-radius:6px; font-size:13px"></div>
-      <div class="field"><label>apiKey</label><input type="text" id="fbApiKey" placeholder="AIzaSy..." value="AIzaSyDEkrSPdZhJIrwi489Fn7CNluY0Bn7i0LU" /></div>
-      <div class="field"><label>databaseURL</label><input type="text" id="fbDbUrl" placeholder="https://xxxxx-default-rtdb.asia-southeast1.firebasedatabase.app" value="https://khun-tun-pos-default-rtdb.asia-southeast1.firebasedatabase.app" /></div>
+      <div class="field"><label>apiKey</label><input type="text" id="fbApiKey" placeholder="AIzaSy..." autocomplete="off" /></div>
+      <div class="field"><label>databaseURL</label><input type="text" id="fbDbUrl" placeholder="https://xxxxx-default-rtdb.asia-southeast1.firebasedatabase.app" autocomplete="off" /></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap">
         <button class="btn" onclick="connectFirebase()">🔌 เชื่อมต่อ</button>
         <button class="btn ghost" onclick="disconnectFirebase()">ตัดการเชื่อมต่อ</button>
@@ -803,6 +812,13 @@ function fmtTime(iso) {
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// อนุญาตเฉพาะ data:image/... หรือ https:// เพื่อป้องกัน XSS ผ่าน img src (เช่น "x onerror=...", javascript:..)
+function safeImg(u) {
+  if (!u) return '';
+  const s = String(u).trim();
+  if (!/^(data:image\/[a-zA-Z0-9.+-]+;base64,|https:\/\/)/.test(s)) return '';
+  return escapeHtml(s);
 }
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -1154,7 +1170,7 @@ function renderMenus() {
     const profit = (menu.price||0) - cost;
     const margin = menu.price > 0 ? (profit/menu.price*100) : 0;
     return `<div class="card">
-      ${menu.img ? `<img src="${menu.img}" style="width:100%;height:130px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
+      ${safeImg(menu.img) ? `<img src="${safeImg(menu.img)}" style="width:100%;height:130px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
       <h3>${escapeHtml(menu.name)} <span class="badge ${margin>=60?'ok':margin>=40?'warn':'low'}">${margin.toFixed(0)}%</span></h3>
       <div class="meta">${escapeHtml(menu.category||'-')}</div>
       <div class="row"><span>ราคาขาย</span><b>${fmt(menu.price)} ฿</b></div>
@@ -1209,7 +1225,7 @@ function renderMenuImgPreview(data) {
   const wrap = document.getElementById('menuImgPreviewWrap');
   if (!wrap) return;
   wrap.innerHTML = data
-    ? `<img src="${data}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);vertical-align:middle"> <button type="button" class="btn small danger" onclick="clearMenuImg()">ลบรูป</button>`
+    ? `<img src="${safeImg(data)}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);vertical-align:middle"> <button type="button" class="btn small danger" onclick="clearMenuImg()">ลบรูป</button>`
     : '';
 }
 function clearMenuImg() {
@@ -1292,7 +1308,7 @@ function renderPOSMenus() {
   }
   grid.innerHTML = filtered.map(m => `
     <button class="menu-btn" onclick="addToCart('${m.id}')">
-      ${m.img ? `<img src="${m.img}" class="menu-thumb">` : ''}
+      ${safeImg(m.img) ? `<img src="${safeImg(m.img)}" class="menu-thumb">` : ''}
       <div class="name">${escapeHtml(m.name)}</div>
       <div class="cat">${escapeHtml(m.category||'-')}</div>
       <div class="price">${fmt(m.price)} ฿</div>
@@ -2307,7 +2323,7 @@ function renderCustomerMenus() {
   grid.innerHTML = filtered.map(m => {
     const totalInCart = custCart.filter(c=>c.menuId===m.id).reduce((s,c)=>s+c.qty,0);
     return `<div class="menu-btn" style="display:flex; flex-direction:column; gap:6px">
-      ${m.img ? `<img src="${m.img}" class="menu-thumb">` : ''}
+      ${safeImg(m.img) ? `<img src="${safeImg(m.img)}" class="menu-thumb">` : ''}
       <div class="name">${escapeHtml(m.name)}</div>
       <div class="cat">${escapeHtml(m.category||'-')}</div>
       <div class="price">${fmt(m.price)} ฿</div>
@@ -2380,36 +2396,8 @@ function actualSubmitCustomerOrder() {
   const finishSuccess = (mode) => {
     const itemsHtml = items.map(it => { const ol=optLabel(it); return `<div>• ${escapeHtml(it.name)}${ol?' <small style="color:var(--muted)">('+ol+')</small>':''} ×${it.qty}</div>`; }).join('');
     const code = orderCode(fullOrder);
-    const oaUrl = state.line && state.line.oaUrl;
-    // Extract LINE OA basic ID (e.g. "@877fkddu") from the add-friend URL to build a deep link
-    const oaIdMatch = oaUrl && oaUrl.match(/ti\/p\/(@?[A-Za-z0-9_-]+)/);
-    const oaId = oaIdMatch ? oaIdMatch[1] : '';
-    // Deep link that opens LINE OA chat with the order code pre-filled in the message box
-    const deepLink = oaId ? `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}` : '';
-    const lineSection = oaUrl ? `
-      <div style="margin-top:12px; padding:14px; background:#dcfce7; border:1px solid #16a34a; border-radius:8px">
-        <div style="font-weight:bold; color:#15803d; margin-bottom:6px; font-size:14px">🟢 รับแจ้งเตือนสถานะผ่าน LINE</div>
-        <div style="font-size:12px; color:#374151; margin-bottom:10px">รหัสออเดอร์: <b style="font-size:18px; letter-spacing:2px; color:#15803d">${code}</b></div>
-        ${deepLink ? `
-          <a href="${deepLink}" target="_blank" style="display:block; background:#06c755; color:white; text-align:center; padding:12px; border-radius:8px; font-weight:bold; font-size:15px; text-decoration:none; margin-bottom:8px">
-            📨 รับการแจ้งเตือนใน LINE
-          </a>
-          <div style="font-size:11px; color:#6b7280; text-align:center; margin-bottom:10px">
-            กดปุ่มด้านบน → LINE จะเปิดพร้อมรหัสในช่องแชต → กด <b>Send</b> เพื่อยืนยัน
-          </div>
-          <details style="font-size:11px; color:#6b7280">
-            <summary style="cursor:pointer">วิธีอื่น: สแกน QR แล้วพิมพ์รหัสเอง</summary>
-            <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px; margin-top:8px">${makeQR(oaUrl, 180)}</div>
-          </details>
-        ` : `
-          <div style="font-size:12px; color:#374151; margin-bottom:8px">
-            1) สแกน QR ด้านล่างเพื่อแอด LINE OA<br>
-            2) พิมพ์รหัส <b>${code}</b> ในแชต
-          </div>
-          <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px">${makeQR(oaUrl, 200)}</div>
-        `}
-      </div>
-    ` : '';
+    // ระบบแจ้งเตือนผ่าน LINE ส่งเฉพาะร้าน — ลูกค้าไม่ต้องผูก LINE
+    const lineSection = '';
     document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
     document.getElementById('qrBox').innerHTML = `
       <div style="font-size:48px; margin:10px 0">🎉</div>
@@ -2599,10 +2587,10 @@ function connectFirebase() {
         toast('เชื่อมต่อ Firebase สำเร็จ');
       })
       .catch(err => {
-        setFbStatus('❌ ' + (err.message||err) + '<br><small>ถ้าเชื่อมไม่ได้: เช็คว่าเปิด Anonymous Auth + Rules ถูกต้อง</small>', false);
+        setFbStatus('❌ ' + escapeHtml(err.message||err) + '<br><small>ถ้าเชื่อมไม่ได้: เช็คว่าเปิด Anonymous Auth + Rules ถูกต้อง</small>', false);
       });
   } catch(e) {
-    setFbStatus('❌ ' + e.message, false);
+    setFbStatus('❌ ' + escapeHtml(e.message), false);
   }
 }
 function disconnectFirebase() {
@@ -2688,10 +2676,10 @@ function fbRestoreFromStorage() {
       setFbStatus(`✅ เชื่อมต่อแล้ว — Shop ID: <code>${shopId}</code><br><small>UID: <code>${user.uid.slice(0,12)}…</code></small>`, true);
       fbStartSync();
     }).catch(err => {
-      setFbStatus('⚠️ Auth ล้มเหลว: ' + (err.message||err), false);
+      setFbStatus('⚠️ Auth ล้มเหลว: ' + escapeHtml(err.message||err), false);
     });
   } catch(e) {
-    setFbStatus('⚠️ Restore ไม่ได้: ' + e.message, false);
+    setFbStatus('⚠️ Restore ไม่ได้: ' + escapeHtml(e.message), false);
   }
 }
 
