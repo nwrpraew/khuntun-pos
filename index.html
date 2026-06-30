@@ -527,6 +527,26 @@
       </div>
     </div>
     <div class="card" style="margin-top:10px">
+      <h3 style="margin:0 0 8px">🟢 แจ้งเตือนผ่าน LINE OA</h3>
+      <p class="hint">ส่งแจ้งเตือนเข้า LINE เมื่อมีออเดอร์ใหม่ / เปลี่ยนสถานะ / ชำระเงิน (ดูวิธีตั้งค่าในไฟล์ LINE_SETUP.md)</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+        <input type="text" id="lineWebhookInput" placeholder="Apps Script Web App URL" style="flex:2; min-width:240px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit" />
+        <input type="text" id="lineSecretInput" placeholder="Secret (ตั้งเอง ต้องตรงกับ Apps Script)" style="flex:1; min-width:160px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit" />
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+        <input type="text" id="lineOaUrlInput" placeholder="LINE OA Add-friend URL (เช่น https://line.me/R/ti/p/@xxxxx)" style="flex:1; min-width:240px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit" />
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+          <input type="checkbox" id="lineNotifyChk" style="width:18px; height:18px" />
+          <span>เปิดใช้งานแจ้งเตือน LINE</span>
+        </label>
+        <button class="btn" onclick="saveLineSettings()">💾 บันทึก</button>
+        <button class="btn ghost" onclick="testLineNotify()">🔔 ทดสอบส่ง</button>
+      </div>
+      <p class="hint" style="margin-top:6px; font-size:12px">หมายเหตุ: ลูกค้าจะเห็น QR + รหัสออเดอร์หลังกดส่ง — ถ้าแอด LINE OA แล้วพิมพ์รหัสในแชต จะได้รับการแจ้งเตือนสถานะ</p>
+    </div>
+    <div class="card" style="margin-top:10px">
       <h3 style="margin:0 0 8px">🔔 แจ้งเตือนออเดอร์ใหม่</h3>
       <p class="hint">เล่นเสียง "ติ๊ง ติ๊ง" เมื่อมีออเดอร์ใหม่จากลูกค้าเข้ามา</p>
       <label style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer">
@@ -795,6 +815,66 @@ function toggleNotifySound() {
   state.notifySound = document.getElementById('notifySoundChk').checked;
   save();
   if (state.notifySound) playOrderSound(true);
+}
+
+// ====== LINE OA NOTIFICATIONS ======
+function orderCode(o) {
+  return ((o && o.id) || '').slice(-6).toUpperCase();
+}
+function saveLineSettings() {
+  state.line = {
+    enabled: document.getElementById('lineNotifyChk').checked,
+    webhook: document.getElementById('lineWebhookInput').value.trim(),
+    secret: document.getElementById('lineSecretInput').value.trim(),
+    oaUrl: document.getElementById('lineOaUrlInput').value.trim()
+  };
+  save();
+  toast('บันทึกการตั้งค่า LINE แล้ว');
+}
+function loadLineSettings() {
+  const s = state.line || {};
+  const wh = document.getElementById('lineWebhookInput');
+  const sec = document.getElementById('lineSecretInput');
+  const oa = document.getElementById('lineOaUrlInput');
+  const chk = document.getElementById('lineNotifyChk');
+  if (wh) wh.value = s.webhook || '';
+  if (sec) sec.value = s.secret || '';
+  if (oa) oa.value = s.oaUrl || '';
+  if (chk) chk.checked = !!s.enabled;
+}
+function notifyLine(type, order) {
+  const s = state.line || {};
+  if (!s.enabled || !s.webhook || !s.secret) return;
+  try {
+    fetch(s.webhook, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        secret: s.secret,
+        type: type,
+        status: order && order.status,
+        order: order
+      })
+    }).catch(()=>{});
+  } catch (e) { /* silent */ }
+}
+function testLineNotify() {
+  saveLineSettings();
+  const s = state.line || {};
+  if (!s.enabled || !s.webhook || !s.secret) {
+    toast('กรุณาเปิดใช้งาน + ใส่ URL และ Secret ก่อน');
+    return;
+  }
+  notifyLine('new_order', {
+    id: 'TEST' + Date.now(),
+    items: [{ name: 'ทดสอบเมนู', qty: 1, price: 50 }],
+    total: 50,
+    status: 'pending',
+    source: 'pos',
+    note: 'ทดสอบการแจ้งเตือนจากเว็บ POS'
+  });
+  toast('ส่งทดสอบแล้ว เช็ค LINE OA ของคุณ');
 }
 
 // ====== SWEETNESS & DRINK HELPERS ======
@@ -1117,6 +1197,7 @@ function actualConfirmOrder() {
   deductStock(order);
   state.orders.unshift(order);
   save();
+  notifyLine('new_order', order);
   toast(`บันทึก ${fmt(order.total)} ฿ แล้ว`);
   clearCart();
   renderPOS();
@@ -1301,6 +1382,7 @@ function updateOrderStatus(orderId, status) {
   if (status === 'ready') o.readyAt = new Date().toISOString();
   if (status === 'delivered') o.deliveredAt = new Date().toISOString();
   save(); renderActiveQueue(); renderDashboard();
+  notifyLine('status_update', o);
   toast('อัพเดทสถานะ: ' + statusLabel(status));
 }
 function cancelActiveOrder(orderId) {
@@ -1333,6 +1415,7 @@ function selectPayment(method) {
   closeModal('paymentModal');
   currentPaymentOrderId = null;
   renderActiveQueue(); renderDashboard(); renderReports();
+  notifyLine('paid', o);
   toast('ชำระเงินแล้ว (' + paymentLabel(method) + ')');
 }
 
@@ -1392,9 +1475,12 @@ function acceptPending(idx) {
   deductStock(p);
   const fbKey = p.fbKey;
   const { fbKey: _, ...orderClean } = p;
-  state.orders.unshift({ ...orderClean, source: p.source || 'customer-qr', status: 'pending' });
+  const newOrder = { ...orderClean, source: p.source || 'customer-qr', status: 'pending' };
+  state.orders.unshift(newOrder);
   state.pendingOrders.splice(idx,1);
-  save(); renderPOS(); renderDashboard(); toast('ยืนยันออเดอร์แล้ว');
+  save(); renderPOS(); renderDashboard();
+  notifyLine('new_order', newOrder);
+  toast('ยืนยันออเดอร์แล้ว');
   if (fbKey) fbRemovePendingOrder(fbKey).catch(()=>{});
 }
 function rejectPending(idx) {
@@ -1962,6 +2048,7 @@ function setupCustomerView() {
         }
         state.shopName = data.shopName || 'ร้าน';
         state.menus = data.menus.map(m => ({ ...m, recipe: [] }));
+        if (data.lineOaUrl) state.line = { oaUrl: data.lineOaUrl };
         buildCustomerUI();
       }).catch(err => {
         showCustomerError('โหลดเมนูไม่ได้: ' + (err.message||String(err)));
@@ -2117,11 +2204,26 @@ function actualSubmitCustomerOrder() {
   saveCustHistory(fullOrder);
   const finishSuccess = (mode) => {
     const itemsHtml = items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <small style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</small>':''} ×${it.qty}</div>`).join('');
+    const code = orderCode(fullOrder);
+    const oaUrl = state.line && state.line.oaUrl;
+    const lineSection = oaUrl ? `
+      <div style="margin-top:12px; padding:12px; background:#dcfce7; border:1px solid #16a34a; border-radius:8px">
+        <div style="font-weight:bold; color:#15803d; margin-bottom:6px">🟢 รับแจ้งเตือนสถานะผ่าน LINE</div>
+        <div style="font-size:12px; color:#374151; margin-bottom:8px">รหัสออเดอร์: <b style="font-size:18px; letter-spacing:2px; color:#15803d">${code}</b></div>
+        <div style="font-size:12px; color:#374151; margin-bottom:8px">
+          1) สแกน QR ด้านล่างเพื่อแอด LINE OA<br>
+          2) พิมพ์รหัส <b>${code}</b> ในแชต<br>
+          3) รอรับแจ้งเตือนเมื่อออเดอร์เสร็จ / ชำระเงิน
+        </div>
+        <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px">${makeQR(oaUrl, 200)}</div>
+      </div>
+    ` : '';
     document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
     document.getElementById('qrBox').innerHTML = `
       <div style="font-size:48px; margin:10px 0">🎉</div>
       <div style="text-align:left; font-size:13px; padding:0 10px">${itemsHtml}</div>
       ${order.note ? `<div style="margin-top:8px; padding:8px; background:#f9fafb; border-radius:6px; font-size:12px"><b>หมายเหตุ:</b> ${escapeHtml(order.note)}</div>` : ''}
+      ${lineSection}
     `;
     document.getElementById('qrCaption').innerHTML = `<b style="font-size:20px; color:var(--success)">ยอดรวม ${fmt(total)} ฿</b><br><br>🍳 ทางร้านได้รับออเดอร์แล้ว กรุณารอสักครู่<br><small style="color:var(--muted)">${mode==='fb'?'(ส่งผ่าน Firebase)':''} กดปุ่ม "ประวัติของฉัน" เพื่อดูออเดอร์เก่า</small>`;
     document.getElementById('qrModal').classList.add('active');
@@ -2372,6 +2474,7 @@ function fbPublishMenu() {
   const payload = {
     shopName: state.shopName || 'ร้านอาหาร',
     menus: state.menus.map(m => ({ id: m.id, name: m.name, category: m.category||'', price: m.price })),
+    lineOaUrl: (state.line && state.line.oaUrl) || '',
     updatedAt: Date.now()
   };
   return fbEnsureAuth().then(() => fbDb.ref(`shops/${shopId}/menu`).set(payload));
@@ -2408,6 +2511,7 @@ function renderAll() {
   // Notification sound toggle (default ON if undefined)
   const chk = document.getElementById('notifySoundChk');
   if (chk) chk.checked = state.notifySound !== false;
+  loadLineSettings();
   renderMaterials();
   renderMenus();
   renderDashboard();
