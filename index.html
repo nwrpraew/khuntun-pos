@@ -2206,16 +2206,33 @@ function actualSubmitCustomerOrder() {
     const itemsHtml = items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <small style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</small>':''} ×${it.qty}</div>`).join('');
     const code = orderCode(fullOrder);
     const oaUrl = state.line && state.line.oaUrl;
+    // Extract LINE OA basic ID (e.g. "@877fkddu") from the add-friend URL to build a deep link
+    const oaIdMatch = oaUrl && oaUrl.match(/ti\/p\/(@?[A-Za-z0-9_-]+)/);
+    const oaId = oaIdMatch ? oaIdMatch[1] : '';
+    // Deep link that opens LINE OA chat with the order code pre-filled in the message box
+    const deepLink = oaId ? `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}` : '';
     const lineSection = oaUrl ? `
-      <div style="margin-top:12px; padding:12px; background:#dcfce7; border:1px solid #16a34a; border-radius:8px">
-        <div style="font-weight:bold; color:#15803d; margin-bottom:6px">🟢 รับแจ้งเตือนสถานะผ่าน LINE</div>
-        <div style="font-size:12px; color:#374151; margin-bottom:8px">รหัสออเดอร์: <b style="font-size:18px; letter-spacing:2px; color:#15803d">${code}</b></div>
-        <div style="font-size:12px; color:#374151; margin-bottom:8px">
-          1) สแกน QR ด้านล่างเพื่อแอด LINE OA<br>
-          2) พิมพ์รหัส <b>${code}</b> ในแชต<br>
-          3) รอรับแจ้งเตือนเมื่อออเดอร์เสร็จ / ชำระเงิน
-        </div>
-        <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px">${makeQR(oaUrl, 200)}</div>
+      <div style="margin-top:12px; padding:14px; background:#dcfce7; border:1px solid #16a34a; border-radius:8px">
+        <div style="font-weight:bold; color:#15803d; margin-bottom:6px; font-size:14px">🟢 รับแจ้งเตือนสถานะผ่าน LINE</div>
+        <div style="font-size:12px; color:#374151; margin-bottom:10px">รหัสออเดอร์: <b style="font-size:18px; letter-spacing:2px; color:#15803d">${code}</b></div>
+        ${deepLink ? `
+          <a href="${deepLink}" target="_blank" style="display:block; background:#06c755; color:white; text-align:center; padding:12px; border-radius:8px; font-weight:bold; font-size:15px; text-decoration:none; margin-bottom:8px">
+            📨 รับการแจ้งเตือนใน LINE
+          </a>
+          <div style="font-size:11px; color:#6b7280; text-align:center; margin-bottom:10px">
+            กดปุ่มด้านบน → LINE จะเปิดพร้อมรหัสในช่องแชต → กด <b>Send</b> เพื่อยืนยัน
+          </div>
+          <details style="font-size:11px; color:#6b7280">
+            <summary style="cursor:pointer">วิธีอื่น: สแกน QR แล้วพิมพ์รหัสเอง</summary>
+            <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px; margin-top:8px">${makeQR(oaUrl, 180)}</div>
+          </details>
+        ` : `
+          <div style="font-size:12px; color:#374151; margin-bottom:8px">
+            1) สแกน QR ด้านล่างเพื่อแอด LINE OA<br>
+            2) พิมพ์รหัส <b>${code}</b> ในแชต
+          </div>
+          <div style="display:flex; justify-content:center; background:white; padding:8px; border-radius:6px">${makeQR(oaUrl, 200)}</div>
+        `}
       </div>
     ` : '';
     document.getElementById('qrTitle').textContent = '✅ ส่งออเดอร์เรียบร้อย';
