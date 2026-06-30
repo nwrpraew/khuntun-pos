@@ -235,6 +235,7 @@
   .menu-btn .name { font-size: 13px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
   .menu-btn .price { font-size: 14px; color: var(--primary); font-weight: 700; }
   .menu-btn .cat { font-size: 10px; color: var(--muted); }
+  .menu-thumb { width: 100%; height: 70px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; display: block; }
 
   .cart {
     background: white;
@@ -276,6 +277,22 @@
   }
   .cart-total .row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
   .cart-total .row.big { font-size: 16px; font-weight: 700; padding-top: 6px; border-top: 1px dashed #e5e7eb; margin-top: 4px; }
+
+  /* ตัวเลือกเมนู */
+  .opt-grouptitle { font-weight: 600; font-size: 14px; margin: 10px 0 6px; }
+  .opt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  .opt-chip {
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: white; cursor: pointer; font-size: 13px; color: var(--text);
+  }
+  .opt-chip.on { background: var(--primary); color: white; border-color: var(--primary); }
+  .opt-rows { display: flex; flex-direction: column; gap: 6px; }
+  .opt-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; font-size: 14px;
+  }
+  .opt-row.on { border-color: var(--primary); background: #fff7ed; }
 
   /* QR */
   .qr-box {
@@ -620,6 +637,12 @@
       <div class="field"><label>ราคาขาย (฿) *</label><input type="number" id="menuPrice" min="0" step="0.01" value="0" /></div>
     </div>
     <div class="field">
+      <label>รูปเมนู</label>
+      <div id="menuImgPreviewWrap" style="margin-bottom:6px"></div>
+      <input type="file" id="menuImgFile" accept="image/*" onchange="handleMenuImg(this)" />
+      <input type="hidden" id="menuImgData" />
+    </div>
+    <div class="field">
       <label>สูตร (วัตถุดิบที่ใช้)</label>
       <div id="recipeItems"></div>
       <button class="btn small ghost" type="button" onclick="addRecipeRow()">+ เพิ่มวัตถุดิบ</button>
@@ -684,6 +707,20 @@
     <div id="sweetOptions"></div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="cancelSweetness()">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="optModal">
+  <div class="modal" style="max-width:420px">
+    <h2 id="optTitle">🧋 ตัวเลือก</h2>
+    <div id="optBody"></div>
+    <div class="cart-total" style="margin-top:8px">
+      <div class="row big"><span>ราคาต่อแก้ว</span><b id="optTotal">0.00 ฿</b></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="cancelOptions()">ยกเลิก</button>
+      <button class="btn success" onclick="confirmOptions()">เพิ่มลงตะกร้า</button>
     </div>
   </div>
 </div>
@@ -917,6 +954,108 @@ function cancelSweetness() {
   _sweetCB = null;
 }
 
+// ====== OPTIONS: เย็น/ปั่น, ความหวาน, ท็อปปิ้ง (ตามเมนูร้านคุณตุ่น) ======
+const TEMP_OPTIONS = [
+  { id: 'cold',    short: 'เย็น',  price: 0 },
+  { id: 'blended', short: 'ปั่น',  price: 10 }   // ปั่น +10 (เฉพาะเมนูที่ปั่นได้)
+];
+const SWEET_EXTRA_PRICE = 10;                     // เพิ่มหวาน (>125%) +10
+const TOPPING_OPTIONS = [
+  { id: 'whip',     label: 'วิปครีม',             price: 15 },
+  { id: 'boba',     label: 'ไข่มุกบราวน์ชูการ์',   price: 10 },
+  { id: 'jelly',    label: 'เยลลี่เม็ดกลมสีแดง',    price: 10 },
+  { id: 'ovaltine', label: 'โอวัลตินเฟลค์',         price: 10 }
+];
+function tempLabel(id) { const t = TEMP_OPTIONS.find(x=>x.id===id); return t ? t.short : ''; }
+function toppingLabel(id) { const t = TOPPING_OPTIONS.find(x=>x.id===id); return t ? t.label : ''; }
+// เมนูที่ปั่นได้ = ไม่ใช่หมวดร้อน และยังไม่ใช่เมนูปั่นอยู่แล้ว
+function canBlend(m) {
+  if (!m) return false;
+  const cat = m.category || '';
+  if (/ร้อน/.test(cat)) return false;
+  if (/ปั่น/.test(cat)) return false;
+  return true;
+}
+// ราคาส่วนเพิ่มจากตัวเลือก
+function optExtra(o) {
+  let e = 0;
+  if (o.temp === 'blended') e += 10;
+  if (o.sweetness === 'extra') e += SWEET_EXTRA_PRICE;
+  (o.toppings || []).forEach(id => { const t = TOPPING_OPTIONS.find(x=>x.id===id); if (t) e += t.price; });
+  return e;
+}
+function itemUnitPrice(m, o) { return (m ? m.price : 0) + optExtra(o || {}); }
+// ป้ายกำกับตัวเลือกสำหรับแสดงผล (ซ่อน "หวานปกติ" ที่เป็นค่าเริ่มต้น)
+function optLabel(item) {
+  const parts = [];
+  if (item.temp) parts.push(tempLabel(item.temp));
+  if (item.sweetness && item.sweetness !== 'normal') parts.push(sweetLabel(item.sweetness));
+  (item.toppings || []).forEach(id => parts.push(toppingLabel(id)));
+  return parts.filter(Boolean).join(', ');
+}
+// เปรียบเทียบตัวเลือก 2 รายการ (ใช้รวมรายการซ้ำในตะกร้า)
+function sameOpts(a, b) {
+  if ((a.sweetness||null) !== (b.sweetness||null)) return false;
+  if ((a.temp||null) !== (b.temp||null)) return false;
+  const ta = (a.toppings||[]).slice().sort().join(',');
+  const tb = (b.toppings||[]).slice().sort().join(',');
+  return ta === tb;
+}
+
+// ---- หน้าต่างเลือกตัวเลือก ----
+let _optCB = null, _optMenuId = null, _optState = null;
+function openOptions(menuId, callback) {
+  const m = state.menus.find(x=>x.id===menuId);
+  if (!m) return callback({ sweetness:null, temp:null, toppings:[] });
+  _optMenuId = menuId;
+  _optCB = callback;
+  _optState = {
+    sweetness: isDrinkMenu(m) ? 'normal' : null,
+    temp: canBlend(m) ? 'cold' : null,
+    toppings: []
+  };
+  document.getElementById('optTitle').textContent = '🧋 ' + m.name;
+  renderOptions();
+  document.getElementById('optModal').classList.add('active');
+}
+function renderOptions() {
+  const m = state.menus.find(x=>x.id===_optMenuId);
+  if (!m) return;
+  let html = '';
+  if (canBlend(m)) {
+    html += `<div class="opt-grouptitle">แบบ</div><div class="opt-chips">` +
+      TEMP_OPTIONS.map(t => `<button class="opt-chip ${_optState.temp===t.id?'on':''}" onclick="setOptTemp('${t.id}')">${t.short}${t.price?` +${t.price}`:''}</button>`).join('') +
+      `</div>`;
+  }
+  if (isDrinkMenu(m)) {
+    html += `<div class="opt-grouptitle">ความหวาน</div><div class="opt-chips">` +
+      SWEETNESS_OPTIONS.map(s => `<button class="opt-chip ${_optState.sweetness===s.id?'on':''}" onclick="setOptSweet('${s.id}')">${s.short}${s.id==='extra'?` +${SWEET_EXTRA_PRICE}`:''}</button>`).join('') +
+      `</div>`;
+  }
+  html += `<div class="opt-grouptitle">ท็อปปิ้ง (เลือกได้หลายอย่าง)</div><div class="opt-rows">` +
+    TOPPING_OPTIONS.map(t => `<label class="opt-row ${_optState.toppings.includes(t.id)?'on':''}"><span><input type="checkbox" ${_optState.toppings.includes(t.id)?'checked':''} onchange="toggleTopping('${t.id}')"> ${t.label}</span><span>+${t.price} ฿</span></label>`).join('') +
+    `</div>`;
+  document.getElementById('optBody').innerHTML = html;
+  document.getElementById('optTotal').textContent = fmt(itemUnitPrice(m, _optState)) + ' ฿';
+}
+function setOptTemp(id) { _optState.temp = id; renderOptions(); }
+function setOptSweet(id) { _optState.sweetness = id; renderOptions(); }
+function toggleTopping(id) {
+  const i = _optState.toppings.indexOf(id);
+  if (i >= 0) _optState.toppings.splice(i,1); else _optState.toppings.push(id);
+  renderOptions();
+}
+function confirmOptions() {
+  closeModal('optModal');
+  const cb = _optCB, st = _optState;
+  _optCB = null; _optMenuId = null; _optState = null;
+  if (cb) cb(st);
+}
+function cancelOptions() {
+  closeModal('optModal');
+  _optCB = null; _optMenuId = null; _optState = null;
+}
+
 // ====== TABS ======
 document.querySelectorAll('#mainNav button').forEach(b => {
   b.addEventListener('click', () => {
@@ -1015,6 +1154,7 @@ function renderMenus() {
     const profit = (menu.price||0) - cost;
     const margin = menu.price > 0 ? (profit/menu.price*100) : 0;
     return `<div class="card">
+      ${menu.img ? `<img src="${menu.img}" style="width:100%;height:130px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
       <h3>${escapeHtml(menu.name)} <span class="badge ${margin>=60?'ok':margin>=40?'warn':'low'}">${margin.toFixed(0)}%</span></h3>
       <div class="meta">${escapeHtml(menu.category||'-')}</div>
       <div class="row"><span>ราคาขาย</span><b>${fmt(menu.price)} ฿</b></div>
@@ -1035,9 +1175,47 @@ function openMenuModal(id) {
   document.getElementById('menuName').value = m.name;
   document.getElementById('menuCategory').value = m.category || '';
   document.getElementById('menuPrice').value = m.price;
+  document.getElementById('menuImgData').value = m.img || '';
+  document.getElementById('menuImgFile').value = '';
+  renderMenuImgPreview(m.img || '');
   document.getElementById('recipeItems').innerHTML = '';
   (m.recipe.length ? m.recipe : [{matId:'',qty:0}]).forEach(r=>addRecipeRow(r));
   document.getElementById('menuModal').classList.add('active');
+}
+// อัปโหลด+ย่อรูปเมนูเป็น base64 (กว้าง/สูงสุด 400px) เพื่อให้ไฟล์เล็ก
+function handleMenuImg(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 400;
+      let w = img.width, h = img.height;
+      if (w > h && w > max) { h = Math.round(h*max/w); w = max; }
+      else if (h >= w && h > max) { w = Math.round(w*max/h); h = max; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const data = canvas.toDataURL('image/jpeg', 0.8);
+      document.getElementById('menuImgData').value = data;
+      renderMenuImgPreview(data);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function renderMenuImgPreview(data) {
+  const wrap = document.getElementById('menuImgPreviewWrap');
+  if (!wrap) return;
+  wrap.innerHTML = data
+    ? `<img src="${data}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);vertical-align:middle"> <button type="button" class="btn small danger" onclick="clearMenuImg()">ลบรูป</button>`
+    : '';
+}
+function clearMenuImg() {
+  document.getElementById('menuImgData').value = '';
+  document.getElementById('menuImgFile').value = '';
+  renderMenuImgPreview('');
 }
 function addRecipeRow(r) {
   r = r || { matId:'', qty:0 };
@@ -1068,6 +1246,7 @@ function saveMenu() {
   const data = { name,
     category: document.getElementById('menuCategory').value.trim(),
     price: parseFloat(document.getElementById('menuPrice').value)||0,
+    img: document.getElementById('menuImgData').value || '',
     recipe
   };
   if (editingMenuId) {
@@ -1113,6 +1292,7 @@ function renderPOSMenus() {
   }
   grid.innerHTML = filtered.map(m => `
     <button class="menu-btn" onclick="addToCart('${m.id}')">
+      ${m.img ? `<img src="${m.img}" class="menu-thumb">` : ''}
       <div class="name">${escapeHtml(m.name)}</div>
       <div class="cat">${escapeHtml(m.category||'-')}</div>
       <div class="price">${fmt(m.price)} ฿</div>
@@ -1122,34 +1302,25 @@ function renderPOSMenus() {
 function addToCart(menuId, qty=1) {
   const menu = state.menus.find(m=>m.id===menuId);
   if (!menu) { toast('ไม่พบเมนู'); return; }
-  if (isDrinkMenu(menu)) {
-    askSweetness(menuId, (sw) => addToCartFinal(menuId, qty, sw, menu.name));
-    return;
-  }
-  addToCartFinal(menuId, qty, null, menu.name);
+  openOptions(menuId, (opt) => addToCartFinal(menuId, qty, opt, menu.name));
 }
-function addToCartFinal(menuId, qty, sweetness, displayName) {
-  const ex = cart.find(c => c.menuId===menuId && (c.sweetness||null)===(sweetness||null));
+function addToCartFinal(menuId, qty, opt, displayName) {
+  const item = { menuId, qty, sweetness: opt.sweetness||null, temp: opt.temp||null, toppings: opt.toppings||[] };
+  const ex = cart.find(c => c.menuId===menuId && sameOpts(c, item));
   if (ex) ex.qty += qty;
-  else cart.push({ menuId, qty, sweetness: sweetness || null });
+  else cart.push(item);
   renderCart();
-  const sl = sweetness ? ' (' + sweetLabel(sweetness) + ')' : '';
-  toast(`+ ${displayName||''}${sl}`);
+  const ol = optLabel(item);
+  toast(`+ ${displayName||''}${ol ? ' (' + ol + ')' : ''}`);
 }
-function cartKey(c) { return c.menuId + '|' + (c.sweetness||''); }
-function changeQty(menuId, sweetness, delta) {
-  const sw = sweetness || null;
-  const c = cart.find(x => x.menuId===menuId && (x.sweetness||null)===sw);
+function changeQty(idx, delta) {
+  const c = cart[idx];
   if (!c) return;
   c.qty += delta;
-  if (c.qty <= 0) cart = cart.filter(x => !(x.menuId===menuId && (x.sweetness||null)===sw));
+  if (c.qty <= 0) cart.splice(idx, 1);
   renderCart();
 }
-function removeCartItem(menuId, sweetness) {
-  const sw = sweetness || null;
-  cart = cart.filter(x => !(x.menuId===menuId && (x.sweetness||null)===sw));
-  renderCart();
-}
+function removeCartItem(idx) { cart.splice(idx, 1); renderCart(); }
 function clearCart() { cart = []; document.getElementById('cartNote').value=''; renderCart(); }
 function renderCart() {
   const itemsBox = document.getElementById('cartItems');
@@ -1162,24 +1333,25 @@ function renderCart() {
     totalBox.style.display = 'none';
     return;
   }
-  itemsBox.innerHTML = cart.map(c => {
+  itemsBox.innerHTML = cart.map((c, idx) => {
     const m = state.menus.find(x=>x.id===c.menuId);
     if (!m) return '';
-    const sw = c.sweetness || '';
+    const ol = optLabel(c);
+    const unit = itemUnitPrice(m, c);
     return `<div class="cart-item">
-      <div>${escapeHtml(m.name)}${sw?` <span class="badge info" style="font-size:10px">${sweetLabel(sw)}</span>`:''}<br><small style="color:var(--muted)">${fmt(m.price)} ฿</small></div>
+      <div>${escapeHtml(m.name)}${ol?` <span class="badge info" style="font-size:10px">${escapeHtml(ol)}</span>`:''}<br><small style="color:var(--muted)">${fmt(unit)} ฿</small></div>
       <div class="qty-ctl">
-        <button onclick="changeQty('${c.menuId}','${sw}',-1)">−</button>
+        <button onclick="changeQty(${idx},-1)">−</button>
         <span>${c.qty}</span>
-        <button onclick="changeQty('${c.menuId}','${sw}',1)">+</button>
+        <button onclick="changeQty(${idx},1)">+</button>
       </div>
-      <div style="font-weight:600">${fmt(m.price*c.qty)}</div>
+      <div style="font-weight:600">${fmt(unit*c.qty)}</div>
     </div>`;
   }).join('');
   let subtotal=0, cost=0;
   cart.forEach(c => {
     const m = state.menus.find(x=>x.id===c.menuId);
-    if (m) { subtotal += m.price*c.qty; cost += recipeCost(m)*c.qty; }
+    if (m) { subtotal += itemUnitPrice(m,c)*c.qty; cost += recipeCost(m)*c.qty; }
   });
   document.getElementById('cartSubtotal').textContent = fmt(subtotal) + ' ฿';
   document.getElementById('cartCost').textContent = fmt(cost) + ' ฿';
@@ -1217,11 +1389,13 @@ function openPreview(type) {
     const rows = cart.map(c => {
       const m = state.menus.find(x=>x.id===c.menuId);
       if (!m) return '';
-      const line = m.price * c.qty;
+      const unit = itemUnitPrice(m, c);
+      const line = unit * c.qty;
       const lineCost = recipeCost(m) * c.qty;
       subtotal += line; cost += lineCost;
-      const sw = c.sweetness ? `<br><small style="color:var(--muted)">${sweetLabel(c.sweetness)}</small>` : '';
-      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(m.price)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
+      const ol = optLabel(c);
+      const sw = ol ? `<br><small style="color:var(--muted)">${ol}</small>` : '';
+      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(unit)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
     }).join('');
     const note = (document.getElementById('cartNote')?.value||'').trim();
     titleEl.textContent = '📝 ตรวจสอบออเดอร์ก่อนยืนยัน';
@@ -1246,10 +1420,12 @@ function openPreview(type) {
     const rows = custCart.map(c => {
       const m = state.menus.find(x=>x.id===c.menuId);
       if (!m) return '';
-      const line = m.price * c.qty;
+      const unit = itemUnitPrice(m, c);
+      const line = unit * c.qty;
       total += line;
-      const sw = c.sweetness ? `<br><small style="color:var(--muted)">${sweetLabel(c.sweetness)}</small>` : '';
-      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(m.price)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
+      const ol = optLabel(c);
+      const sw = ol ? `<br><small style="color:var(--muted)">${ol}</small>` : '';
+      return `<tr><td>${escapeHtml(m.name)}${sw}</td><td style="text-align:center">×${c.qty}</td><td class="num">${fmt(unit)}</td><td class="num"><b>${fmt(line)}</b></td></tr>`;
     }).join('');
     const note = (document.getElementById('custNote')?.value||'').trim();
     titleEl.textContent = '📝 ตรวจสอบก่อนส่ง';
@@ -1282,9 +1458,10 @@ function buildOrder(items, note, source) {
     const m = state.menus.find(x=>x.id===c.menuId);
     if (!m) return null;
     const lineCost = recipeCost(m)*c.qty;
-    const lineTotal = m.price*c.qty;
+    const unit = itemUnitPrice(m, c);
+    const lineTotal = unit*c.qty;
     total += lineTotal; cost += lineCost;
-    return { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: recipeCost(m), sweetness: c.sweetness || null };
+    return { menuId: c.menuId, name: m.name, qty: c.qty, price: unit, cost: recipeCost(m), sweetness: c.sweetness || null, temp: c.temp || null, toppings: c.toppings || [] };
   }).filter(Boolean);
   return {
     id: uid(),
@@ -1346,7 +1523,7 @@ function renderQueueCard(o, num) {
   const status = o.status || 'pending';
   const info = STATUS_LABELS[status] || STATUS_LABELS.pending;
   const borderColor = status==='ready' ? '#16a34a' : status==='delivered' ? '#0ea5e9' : '#facc15';
-  const items = o.items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <span style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</span>':''} ×${it.qty}</div>`).join('');
+  const items = o.items.map(it => { const ol=optLabel(it); return `<div>• ${escapeHtml(it.name)}${ol?' <span style="color:var(--muted)">('+ol+')</span>':''} ×${it.qty}</div>`; }).join('');
   let actions = '';
   if (status === 'pending') {
     actions += `<button class="btn small success" onclick="updateOrderStatus('${o.id}','ready')">✓ ทำเสร็จ</button>`;
@@ -1447,7 +1624,7 @@ function renderPendingOrders() {
     ${state.pendingOrders.map((p,i) => `
       <div style="border-top:1px dashed #ccc; padding:8px 0">
         <div style="font-size:12px; color:var(--muted)">${fmtTime(p.timestamp)} ${p.note?'• '+escapeHtml(p.note):''}</div>
-        <div style="margin:4px 0">${p.items.map(it=>`${escapeHtml(it.name)} ×${it.qty}`).join(', ')}</div>
+        <div style="margin:4px 0">${p.items.map(it=>{const ol=optLabel(it);return escapeHtml(it.name)+(ol?' ('+ol+')':'')+` ×${it.qty}`;}).join(', ')}</div>
         <div style="display:flex; justify-content:space-between; align-items:center">
           <b>${fmt(p.total)} ฿</b>
           <div>
@@ -1733,7 +1910,7 @@ function renderOrdersTable(orders) {
     return `
     <tr>
       <td>${fmtTime(o.timestamp)}</td>
-      <td>${o.items.map(it=>escapeHtml(it.name)+(it.sweetness?' ('+sweetLabel(it.sweetness)+')':'')+' ×'+it.qty).join(', ')}${o.note?'<br><small style="color:var(--muted)">'+escapeHtml(o.note)+'</small>':''}</td>
+      <td>${o.items.map(it=>{const ol=optLabel(it);return escapeHtml(it.name)+(ol?' ('+ol+')':'')+' ×'+it.qty;}).join(', ')}${o.note?'<br><small style="color:var(--muted)">'+escapeHtml(o.note)+'</small>':''}</td>
       <td><span class="badge ${st.cls}">${st.emoji} ${st.label}</span>${pay}</td>
       <td class="num">${fmt(o.total)}</td>
       <td class="num" style="color:${o.profit>=0?'var(--success)':'var(--danger)'}">${fmt(o.profit)}</td>
@@ -1752,7 +1929,7 @@ function viewOrder(id) {
     <div style="margin:6px 0"><span class="badge ${st.cls}">${st.emoji} ${st.label}</span>${payLine}</div>
     <table class="simple" style="margin-top:8px">
       <thead><tr><th>เมนู</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th></tr></thead>
-      <tbody>${o.items.map(it=>`<tr><td>${escapeHtml(it.name)}${it.sweetness?'<br><small style="color:var(--muted)">'+sweetLabel(it.sweetness)+'</small>':''}</td><td class="num">${it.qty}</td><td class="num">${fmt(it.price)}</td><td class="num">${fmt(it.price*it.qty)}</td></tr>`).join('')}</tbody>
+      <tbody>${o.items.map(it=>{const ol=optLabel(it);return `<tr><td>${escapeHtml(it.name)}${ol?'<br><small style="color:var(--muted)">'+ol+'</small>':''}</td><td class="num">${it.qty}</td><td class="num">${fmt(it.price)}</td><td class="num">${fmt(it.price*it.qty)}</td></tr>`;}).join('')}</tbody>
       <tfoot>
         <tr><th colspan="3">ยอดขาย</th><th class="num">${fmt(o.total)}</th></tr>
         <tr><th colspan="3">ต้นทุน</th><th class="num">${fmt(o.cost)}</th></tr>
@@ -2130,6 +2307,7 @@ function renderCustomerMenus() {
   grid.innerHTML = filtered.map(m => {
     const totalInCart = custCart.filter(c=>c.menuId===m.id).reduce((s,c)=>s+c.qty,0);
     return `<div class="menu-btn" style="display:flex; flex-direction:column; gap:6px">
+      ${m.img ? `<img src="${m.img}" class="menu-thumb">` : ''}
       <div class="name">${escapeHtml(m.name)}</div>
       <div class="cat">${escapeHtml(m.category||'-')}</div>
       <div class="price">${fmt(m.price)} ฿</div>
@@ -2141,24 +2319,20 @@ function renderCustomerMenus() {
 function custAdd(id) {
   const m = state.menus.find(x=>x.id===id);
   if (!m) return;
-  if (isDrinkMenu(m)) {
-    askSweetness(id, (sw) => custAddFinal(id, sw));
-    return;
-  }
-  custAddFinal(id, null);
+  openOptions(id, (opt) => custAddFinal(id, opt));
 }
-function custAddFinal(id, sw) {
-  const ex = custCart.find(x=>x.menuId===id && (x.sweetness||null)===(sw||null));
+function custAddFinal(id, opt) {
+  const item = { menuId: id, qty: 1, sweetness: opt.sweetness||null, temp: opt.temp||null, toppings: opt.toppings||[] };
+  const ex = custCart.find(x=>x.menuId===id && sameOpts(x, item));
   if (ex) ex.qty += 1;
-  else custCart.push({ menuId: id, qty: 1, sweetness: sw || null });
+  else custCart.push(item);
   renderCustomerMenus();
 }
-function custChangeQty(id, sweetness, d) {
-  const sw = sweetness || null;
-  const c = custCart.find(x=>x.menuId===id && (x.sweetness||null)===sw);
+function custChangeQty(idx, d) {
+  const c = custCart[idx];
   if (!c) return;
   c.qty += d;
-  if (c.qty <= 0) custCart = custCart.filter(x=>!(x.menuId===id && (x.sweetness||null)===sw));
+  if (c.qty <= 0) custCart.splice(idx, 1);
   renderCustomerMenus();
 }
 function renderCustomerCart() {
@@ -2166,17 +2340,18 @@ function renderCustomerCart() {
   if (!custCart.length) { box.style.display='none'; return; }
   box.style.display='block';
   let total = 0;
-  document.getElementById('custCartItems').innerHTML = custCart.map(c => {
+  document.getElementById('custCartItems').innerHTML = custCart.map((c, idx) => {
     const m = state.menus.find(x=>x.id===c.menuId);
     if (!m) return '';
-    const line = m.price*c.qty; total += line;
-    const sw = c.sweetness || '';
+    const unit = itemUnitPrice(m, c);
+    const line = unit*c.qty; total += line;
+    const ol = optLabel(c);
     return `<div class="cart-item">
-      <div>${escapeHtml(m.name)}${sw?` <span class="badge info" style="font-size:10px">${sweetLabel(sw)}</span>`:''}</div>
+      <div>${escapeHtml(m.name)}${ol?` <span class="badge info" style="font-size:10px">${escapeHtml(ol)}</span>`:''}<br><small style="color:var(--muted)">${fmt(unit)} ฿</small></div>
       <div class="qty-ctl">
-        <button onclick="custChangeQty('${c.menuId}','${sw}',-1)">−</button>
+        <button onclick="custChangeQty(${idx},-1)">−</button>
         <span>${c.qty}</span>
-        <button onclick="custChangeQty('${c.menuId}','${sw}',1)">+</button>
+        <button onclick="custChangeQty(${idx},1)">+</button>
       </div>
       <div style="font-weight:600">${fmt(line)}</div>
     </div>`;
@@ -2192,7 +2367,7 @@ function actualSubmitCustomerOrder() {
   // Build order with available data (recipes not in customer view)
   const items = custCart.map(c => {
     const m = state.menus.find(x=>x.id===c.menuId);
-    return m ? { menuId: c.menuId, name: m.name, qty: c.qty, price: m.price, cost: 0, sweetness: c.sweetness || null } : null;
+    return m ? { menuId: c.menuId, name: m.name, qty: c.qty, price: itemUnitPrice(m, c), cost: 0, sweetness: c.sweetness || null, temp: c.temp || null, toppings: c.toppings || [] } : null;
   }).filter(Boolean);
   const total = items.reduce((s,it)=>s+it.price*it.qty, 0);
   const order = {
@@ -2203,7 +2378,7 @@ function actualSubmitCustomerOrder() {
   const fullOrder = { ...order, id: uid(), timestamp: new Date().toISOString(), status: 'pending' };
   saveCustHistory(fullOrder);
   const finishSuccess = (mode) => {
-    const itemsHtml = items.map(it => `<div>• ${escapeHtml(it.name)}${it.sweetness?' <small style="color:var(--muted)">('+sweetLabel(it.sweetness)+')</small>':''} ×${it.qty}</div>`).join('');
+    const itemsHtml = items.map(it => { const ol=optLabel(it); return `<div>• ${escapeHtml(it.name)}${ol?' <small style="color:var(--muted)">('+ol+')</small>':''} ×${it.qty}</div>`; }).join('');
     const code = orderCode(fullOrder);
     const oaUrl = state.line && state.line.oaUrl;
     // Extract LINE OA basic ID (e.g. "@877fkddu") from the add-friend URL to build a deep link
@@ -2490,7 +2665,7 @@ function fbPublishMenu() {
   const shopId = fbGetShopId();
   const payload = {
     shopName: state.shopName || 'ร้านอาหาร',
-    menus: state.menus.map(m => ({ id: m.id, name: m.name, category: m.category||'', price: m.price })),
+    menus: state.menus.map(m => ({ id: m.id, name: m.name, category: m.category||'', price: m.price, img: m.img||'' })),
     lineOaUrl: (state.line && state.line.oaUrl) || '',
     updatedAt: Date.now()
   };
