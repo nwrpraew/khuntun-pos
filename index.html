@@ -2306,7 +2306,7 @@ function buildCustomerUI() {
       <div class="cart-total" style="margin-top:8px">
         <div class="row big"><span>รวม</span><b id="custTotal">0.00 ฿</b></div>
       </div>
-      <div class="field" style="margin:8px 0"><input type="text" id="custAddress" placeholder="🏠 เลขที่บ้าน / ที่อยู่จัดส่ง" /></div>
+      <div class="field" style="margin:8px 0"><input type="text" id="custAddress" placeholder="🏠 เลขที่บ้าน / ที่อยู่จัดส่ง (จำเป็น) *" required /></div>
       <div class="field" style="margin:8px 0"><input type="text" id="custNote" placeholder="หมายเหตุ เช่น โต๊ะ 5, ไม่ใส่ผัก" /></div>
       <button class="btn block success" onclick="submitCustomerOrder()">📤 ส่งออเดอร์</button>
     </div>
@@ -2378,6 +2378,23 @@ function renderCustomerCart() {
 }
 function submitCustomerOrder() {
   if (!custCart.length) return;
+  // ตรวจเลขที่บ้าน — บังคับกรอก
+  const addrEl = document.getElementById('custAddress');
+  const addr = (addrEl?.value || '').trim();
+  if (!addr) {
+    if (addrEl) {
+      addrEl.style.borderColor = '#dc2626';
+      addrEl.style.background = '#fef2f2';
+      addrEl.focus();
+      addrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    toast('❌ กรุณากรอก "เลขที่บ้าน / ที่อยู่จัดส่ง" ก่อนส่งออเดอร์');
+    return;
+  }
+  if (addrEl) {
+    addrEl.style.borderColor = '';
+    addrEl.style.background = '';
+  }
   openPreview('customer');
 }
 function actualSubmitCustomerOrder() {
