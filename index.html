@@ -2306,6 +2306,7 @@ function buildCustomerUI() {
       <div class="cart-total" style="margin-top:8px">
         <div class="row big"><span>รวม</span><b id="custTotal">0.00 ฿</b></div>
       </div>
+      <div class="field" style="margin:8px 0"><input type="text" id="custAddress" placeholder="🏠 เลขที่บ้าน / ที่อยู่จัดส่ง" /></div>
       <div class="field" style="margin:8px 0"><input type="text" id="custNote" placeholder="หมายเหตุ เช่น โต๊ะ 5, ไม่ใส่ผัก" /></div>
       <button class="btn block success" onclick="submitCustomerOrder()">📤 ส่งออเดอร์</button>
     </div>
@@ -2390,6 +2391,7 @@ function actualSubmitCustomerOrder() {
   const order = {
     items, total, cost: 0, profit: total,
     note: document.getElementById('custNote').value.trim(),
+    address: (document.getElementById('custAddress')?.value || '').trim(),
     source: 'customer-self'
   };
   const fullOrder = { ...order, id: uid(), timestamp: new Date().toISOString(), status: 'pending' };
@@ -2403,6 +2405,7 @@ function actualSubmitCustomerOrder() {
     document.getElementById('qrBox').innerHTML = `
       <div style="font-size:48px; margin:10px 0">🎉</div>
       <div style="text-align:left; font-size:13px; padding:0 10px">${itemsHtml}</div>
+      ${order.address ? `<div style="margin-top:8px; padding:8px; background:#f0f9ff; border-radius:6px; font-size:12px"><b>🏠 ที่อยู่:</b> ${escapeHtml(order.address)}</div>` : ''}
       ${order.note ? `<div style="margin-top:8px; padding:8px; background:#f9fafb; border-radius:6px; font-size:12px"><b>หมายเหตุ:</b> ${escapeHtml(order.note)}</div>` : ''}
       ${lineSection}
     `;
@@ -2410,6 +2413,8 @@ function actualSubmitCustomerOrder() {
     document.getElementById('qrModal').classList.add('active');
     custCart = [];
     document.getElementById('custNote').value = '';
+    const addrEl = document.getElementById('custAddress');
+    if (addrEl) addrEl.value = '';
     setTimeout(()=>{ renderCustomerMenus(); updateCustHistoryBtn(); }, 300);
   };
   if (custFbShopId && fbIsConnected()) {
@@ -2621,12 +2626,15 @@ function fbStartSync() {
       if (fbSeenOrderIds.has(orderId)) return;
       fbSeenOrderIds.add(orderId);
       if (state.pendingOrders.some(p => p.id === orderId)) return;
-      addPendingOrder({ ...order, id: orderId, fbKey: snap.key });
+      const fullOrder = { ...order, id: orderId, fbKey: snap.key };
+      addPendingOrder(fullOrder);
       if (!isCustomerView) {
         renderDashboard();
         if (activeTab === 'pos') renderPOS();
         playOrderSound();
       }
+      // แจ้งเตือนเข้า LINE ร้านพร้อมปุ่มยืนยัน/ปฏิเสธ
+      try { notifyLine('pending_order', fullOrder); } catch(e){}
       toast('🔔 มีออเดอร์ใหม่จากลูกค้า');
     });
 
@@ -2655,8 +2663,37 @@ function fbStopSync() {
 
 // รับ action จาก LINE (ปุ่มในการ์ด) แล้วอัปเดตออเดอร์ใน POS ตามนั้น
 function applyLineAction(code, data, snapRef) {
-  if (!code || !data || !data.status) return;
+  if (!code || !data) return;
   const upper = String(code).toUpperCase();
+
+  // === confirm/reject ออเดอร์ที่รอยืนยัน (pending) ===
+  if (data.action === 'confirm' || data.action === 'reject') {
+    const idx = state.pendingOrders.findIndex(p => ((p.id || '').slice(-6).toUpperCase() === upper));
+    if (idx < 0) {
+      // ไม่เจอใน pendingOrders — อาจถูกยืนยันไปแล้ว
+      if (snapRef) snapRef.remove().catch(()=>{});
+      return;
+    }
+    if (data.action === 'confirm') {
+      acceptPending(idx);
+      toast('🛎️ จาก LINE: ยืนยันออเดอร์ #' + upper);
+    } else {
+      // reject — ลบทิ้งโดยไม่ต้องถาม confirm
+      const fbKey = state.pendingOrders[idx]?.fbKey;
+      state.pendingOrders.splice(idx, 1);
+      if (fbKey) fbRemovePendingOrder(fbKey).catch(()=>{});
+      save(); renderPOS(); renderDashboard();
+      toast('🛎️ จาก LINE: ปฏิเสธออเดอร์ #' + upper);
+    }
+    if (snapRef) snapRef.remove().catch(()=>{});
+    return;
+  }
+
+  // === status/payment update สำหรับออเดอร์ที่ active แล้ว ===
+  if (!data.status) {
+    if (snapRef) snapRef.remove().catch(()=>{});
+    return;
+  }
   const o = state.orders.find(x => ((x.id || '').slice(-6).toUpperCase() === upper));
   if (!o) {
     // ออเดอร์ไม่อยู่ใน state — ลบ action ทิ้งเพื่อไม่ให้ค้าง
