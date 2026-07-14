@@ -1,0 +1,529 @@
+:root {
+  --brand: #e07a3f;
+  --brand-dark: #c2632c;
+  --bg: #faf6f1;
+  --card: #ffffff;
+  --text: #2b2320;
+  --muted: #8a7f77;
+  --line: #ece3d9;
+  --hot: #e0532f;
+  --cold: #2563eb;
+  --blend: #db2777;
+  --topping: #16a34a;
+  --danger: #dc2626;
+  --ok: #16a34a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+button { font-family: inherit; cursor: pointer; }
+img { display: block; }
+
+/* ---------- ปุ่มทั่วไป ---------- */
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--line);
+  color: var(--text);
+}
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:disabled { background: #d8b79f; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.btn-block { width: 100%; }
+.btn-lg { padding: 16px; font-size: 18px; border-radius: 14px; }
+
+/* ============================================================
+   ฝั่งลูกค้า (มือถือ)
+   ============================================================ */
+.cust { max-width: 520px; margin: 0 auto; min-height: 100vh; padding-bottom: 96px; }
+.cust-header {
+  position: relative; z-index: 5;
+  background: var(--brand); color: #fff;
+  padding: 16px 16px 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+.cust-header h1 { margin: 0; font-size: 22px; }
+.cust-header p { margin: 2px 0 0; font-size: 13px; opacity: .92; }
+.cust-header .brand-sub { font-size: 12px; letter-spacing: .5px; text-transform: uppercase; opacity: .85; margin-top: 3px; }
+
+.cat-banner { width: calc(100% - 24px); margin: 0 12px 4px; border-radius: 14px; display: block; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+
+.catbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 10px 12px; background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.catbar::-webkit-scrollbar { display: none; }
+.cat-section { scroll-margin-top: 60px; }
+.catchip {
+  flex: 0 0 auto; border: 1px solid var(--line); background: #fff;
+  border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 600;
+  color: var(--muted); white-space: nowrap;
+}
+.catchip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.cat-title { padding: 16px 16px 6px; font-size: 18px; font-weight: 700; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 6px 12px; }
+.pcard {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  overflow: hidden; text-align: left; padding: 0; position: relative;
+  display: flex; flex-direction: column;
+}
+.pcard:disabled { opacity: .55; }
+.pcard .thumb {
+  width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #eee;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; color: #fff; font-weight: 700;
+}
+.pcard .body { padding: 8px 10px 10px; flex: 1; display: flex; flex-direction: column; }
+.pcard .pname { font-size: 15px; font-weight: 600; line-height: 1.25; }
+.pcard .pprice { margin-top: auto; padding-top: 6px; font-weight: 700; color: var(--brand-dark); }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; border-radius: 6px; padding: 2px 7px; margin-top: 4px; }
+.tag-hot { background: var(--hot); }
+.tag-blend { background: var(--blend); }
+.soldout-badge {
+  position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.72);
+  color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px;
+}
+
+/* ---------- bottom sheet ---------- */
+.sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet {
+  background: #fff; width: 100%; max-width: 520px;
+  border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto;
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp { from { transform: translateY(30px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+.sheet-head { display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; }
+.sheet-head img, .sheet-head .noimg { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex: 0 0 64px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+.sheet-head .st-name { font-size: 18px; font-weight: 700; }
+.sheet-close { margin-left: auto; border: none; background: var(--line); border-radius: 50%; width: 34px; height: 34px; font-size: 18px; flex: 0 0 34px; }
+.sheet-body { padding: 8px 16px 16px; }
+.opt-group { margin-top: 14px; }
+.opt-group h4 { margin: 0 0 8px; font-size: 15px; }
+.opt-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt {
+  border: 1.5px solid var(--line); background: #fff; border-radius: 10px;
+  padding: 10px 12px; font-size: 14px; font-weight: 600; color: var(--text);
+}
+.opt.sel { border-color: var(--brand); background: #fff3ea; color: var(--brand-dark); }
+.opt .plus { color: var(--muted); font-weight: 600; font-size: 12px; margin-left: 4px; }
+
+.qty-row { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+.qty-btn { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--brand); background: #fff; color: var(--brand); font-size: 24px; font-weight: 700; }
+.qty-num { font-size: 20px; font-weight: 700; min-width: 28px; text-align: center; }
+
+.sheet-foot { position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+
+/* ---------- cart bar ---------- */
+.cartbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+  max-width: 520px; margin: 0 auto;
+  background: var(--brand); color: #fff; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 -4px 14px rgba(0,0,0,.12);
+}
+.cartbar .count { background: #fff; color: var(--brand); font-weight: 700; border-radius: 999px; padding: 4px 10px; font-size: 14px; }
+.cartbar .go { margin-left: auto; font-weight: 700; }
+
+/* ---------- cart / checkout page ---------- */
+.page { max-width: 520px; margin: 0 auto; min-height: 100vh; padding-bottom: 120px; }
+.page-head { position: sticky; top: 0; background: #fff; z-index: 10; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.page-head h2 { margin: 0; font-size: 19px; }
+.back-btn { border: none; background: var(--line); border-radius: 50%; width: 38px; height: 38px; font-size: 20px; }
+
+.citem { display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: #fff; }
+.citem .ci-name { font-weight: 600; font-size: 15px; }
+.citem .ci-opts { color: var(--muted); font-size: 13px; margin: 4px 0 0; padding-left: 18px; line-height: 1.5; list-style: disc; }
+.citem .ci-opts li { margin-top: 1px; }
+.citem .ci-price { font-weight: 700; color: var(--brand-dark); margin-top: 4px; }
+.citem .ci-qty { display: flex; align-items: center; gap: 10px; margin-left: auto; align-self: center; }
+.mini-btn { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--brand); background: #fff; color: var(--brand); font-size: 20px; font-weight: 700; }
+
+.summary { background: #fff; margin: 12px 0; padding: 14px 16px; }
+.summary .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; }
+.summary .row.total { font-size: 20px; font-weight: 700; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 10px; }
+.notice { background: #fff7e6; border: 1px solid #ffe0a3; color: #9a6a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin: 10px 16px; }
+
+.remember-hint { margin: 6px 16px 0; padding: 10px 12px; background: #eaf6ec; border: 1px solid #bfe3c6; border-radius: 12px; color: #276b34; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.remember-hint button { margin-left: auto; background: transparent; border: none; color: #8a7f77; font-size: 13px; font-weight: 700; text-decoration: underline; }
+.field { padding: 8px 16px; }
+.field label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 15px; }
+.field input, .field textarea {
+  width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px;
+  font-size: 16px; font-family: inherit; background: #fff;
+}
+.field textarea { min-height: 70px; resize: vertical; }
+.req { color: var(--danger); }
+
+.done-wrap { text-align: center; padding: 60px 24px; }
+.done-check { width: 88px; height: 88px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 48px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+
+/* ---- ติดตามสถานะออเดอร์ (ฝั่งลูกค้า) ---- */
+.track-wrap { text-align: center; padding: 40px 22px 24px; }
+.track-badge { width: 84px; height: 84px; border-radius: 50%; background: #fff4ea; border: 2px solid var(--brand); font-size: 42px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.track-badge.cancel { background: #f4f5f6; border-color: #cbd5e1; color: #6b7280; }
+.track-line { text-align: left; margin: 22px auto 0; max-width: 380px; }
+.track-step { display: flex; gap: 14px; position: relative; padding-bottom: 22px; }
+.track-step:not(:last-child)::before { content: ''; position: absolute; left: 17px; top: 34px; bottom: 0; width: 2px; background: var(--line); }
+.track-step.done:not(:last-child)::before { background: var(--ok); }
+.track-step .dot { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; background: #fff; border: 2px solid var(--line); color: var(--muted); z-index: 1; }
+.track-step.done .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.track-step.active .dot { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 0 0 5px rgba(224,122,63,.18); }
+.track-step .tstep-title { font-weight: 700; font-size: 16px; color: var(--text); }
+.track-step.todo .tstep-title { color: #b3a99f; }
+.track-step .tstep-desc { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.track-step.todo .tstep-desc { color: #c9c0b6; }
+
+/* ปุ่มติดตามออเดอร์ล่าสุด (หน้าเมนู) */
+.track-banner { display: flex; align-items: center; gap: 8px; width: calc(100% - 24px); margin: 10px 12px 0; padding: 12px 16px; background: #fff4ea; border: 1px solid #f0cba8; border-radius: 14px; color: var(--brand-dark); font-size: 15px; font-weight: 700; }
+.track-banner .go { margin-left: auto; }
+
+.empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+
+/* ============================================================
+   ฝั่งแม่ / iPad — ตัวใหญ่ ปุ่มใหญ่ คอนทราสต์สูง
+   ============================================================ */
+.shop { min-height: 100vh; font-size: 20px; background: #f4efe8; }
+.shop-top { background: var(--brand); color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 14px; }
+.shop-top h1 { margin: 0; font-size: 27px; }
+.shop-top .spacer { margin-left: auto; }
+.logout-btn { background: rgba(255,255,255,.2); color: #fff; border: none; border-radius: 12px; padding: 12px 18px; font-size: 18px; font-weight: 600; }
+.sound-btn { background: rgba(255,255,255,.2); color: #fff; border: 2px solid rgba(255,255,255,.5); border-radius: 12px; padding: 10px 16px; font-size: 17px; font-weight: 700; }
+.sound-btn.on { background: #fff; color: var(--brand); border-color: #fff; }
+.sound-select { background: rgba(255,255,255,.2); color: #fff; border: 2px solid rgba(255,255,255,.5); border-radius: 12px; padding: 10px 12px; font-size: 16px; font-weight: 700; max-width: 190px; }
+.sound-select option { color: #333; }
+
+.tabbar { display: flex; background: #fff; border-bottom: 2px solid var(--line); position: sticky; top: 0; z-index: 10; }
+.tabbtn { flex: 1; border: none; background: #fff; padding: 18px 8px; font-size: 21px; font-weight: 700; color: var(--muted); border-bottom: 4px solid transparent; }
+.tabbtn.active { color: var(--brand); border-bottom-color: var(--brand); }
+.tabbtn .badge { background: var(--danger); color: #fff; border-radius: 999px; font-size: 17px; padding: 2px 10px; margin-left: 6px; }
+
+.shop-body { padding: 18px; max-width: 1100px; margin: 0 auto; }
+
+/* login */
+.login-box { max-width: 420px; margin: 8vh auto; background: #fff; border-radius: 20px; padding: 32px 26px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+.login-box h2 { margin: 0 0 6px; font-size: 26px; text-align: center; }
+.login-box p { text-align: center; color: var(--muted); margin: 0 0 22px; }
+.login-box label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 18px; }
+.login-box input { width: 100%; border: 2px solid var(--line); border-radius: 14px; padding: 16px; font-size: 20px; }
+.login-err { background: #fde8e8; color: var(--danger); border-radius: 12px; padding: 12px; margin-top: 16px; font-size: 16px; text-align: center; }
+
+/* order cards */
+.order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+.ocard { background: #fff; border-radius: 18px; border: 2px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
+.ocard.st-waiting { border-color: var(--danger); }
+.ocard.st-confirmed { border-color: #2563eb; }
+.ocard.st-delivering { border-color: var(--brand); }
+.ocard.st-done { opacity: .7; }
+.ocard.st-cancelled { opacity: .6; border-color: #cbd5e1; }
+.ocard-head { padding: 14px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.ocard-head .cust-name { font-size: 25px; font-weight: 700; }
+.ocard-head .time { margin-left: auto; color: var(--muted); font-size: 17px; }
+.stpill { color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 16px; font-weight: 700; }
+.ocard-info { padding: 10px 18px; font-size: 19px; line-height: 1.5; }
+.ocard-info a.call { color: var(--cold); font-weight: 700; text-decoration: none; }
+.ocard-note { background: #fff7e6; border-radius: 10px; padding: 8px 12px; margin-top: 8px; color: #8a5a00; font-weight: 600; }
+
+.oitems { padding: 6px 18px 12px; }
+.oitem { padding: 12px 0; border-top: 1px dashed var(--line); }
+.oitem .oi-top { display: flex; align-items: baseline; gap: 8px; }
+.oitem .oi-qty { background: var(--brand); color: #fff; font-weight: 700; border-radius: 8px; padding: 2px 10px; font-size: 20px; }
+.oitem .oi-name { font-size: 23px; font-weight: 700; }
+.otags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.otag { font-size: 16px; font-weight: 700; color: #fff; border-radius: 8px; padding: 4px 10px; }
+.otag.temp { background: var(--hot); }
+.otag.cold { background: var(--cold); }
+.otag.blend { background: var(--blend); }
+.otag.sweet { background: #ea580c; }
+.otag.top { background: var(--topping); }
+.otag.dip { background: #7c3aed; }
+.oitem .oi-opts { color: var(--muted); font-size: 18px; margin: 6px 0 0; padding-left: 20px; line-height: 1.55; list-style: disc; }
+.oitem .oi-opts li { margin-top: 2px; }
+
+.ocard-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--line); }
+.cod { font-size: 17px; color: var(--muted); }
+.cod.pay-qr { color: #1d4ed8; font-weight: 700; }
+.cod b { font-size: 30px; color: var(--text); display: block; }
+.order-actions { display: flex; flex-direction: column; gap: 10px; }
+.status-btn { width: 100%; margin-top: 12px; border: none; color: #fff; border-radius: 14px; padding: 18px; font-size: 24px; font-weight: 700; }
+.cancel-btn { width: 100%; background: #fff; border: 2px solid #d8dde3; color: #64748b; border-radius: 12px; padding: 12px; font-size: 18px; font-weight: 700; }
+.done-tag { text-align: center; padding: 14px; font-size: 22px; font-weight: 700; color: var(--ok); }
+.cancelled-tag { text-align: center; padding: 14px; font-size: 22px; font-weight: 700; color: #6b7280; }
+.del-order-btn { width: 100%; margin-top: 10px; background: #fff; border: 2px solid #f3c6c6; color: var(--danger); border-radius: 12px; padding: 12px; font-size: 18px; font-weight: 700; }
+
+/* ---- แยกออเดอร์ใหม่ / เสร็จแล้ว (หน้าแม่) ---- */
+.orders-wrap { display: flex; flex-direction: column; }
+.orders-section-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; padding: 12px 16px; background: #fff; border: 2px solid var(--line); border-radius: 14px; }
+.orders-section-head .oss-title { font-size: 22px; font-weight: 800; color: var(--text); }
+.orders-section-head .oss-count { min-width: 32px; height: 32px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; border-radius: 999px; font-size: 18px; font-weight: 800; }
+.oss-toggle { width: 100%; margin-top: 18px; cursor: pointer; text-align: left; background: #f7f3ee; }
+.oss-toggle .oss-count { background: var(--muted); }
+.oss-toggle .oss-chevron { margin-left: auto; font-size: 18px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.orders-empty { text-align: center; color: var(--muted); font-size: 19px; padding: 18px; background: #fff; border: 2px dashed var(--line); border-radius: 14px; }
+
+/* ---- สลิปที่ลูกค้าแนบ (หน้าแม่) ---- */
+.slip-view { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px; background: #eef7ee; border: 2px solid #bfe0c0; border-radius: 12px; color: #15803d; font-weight: 700; font-size: 16px; text-decoration: none; }
+.slip-view-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 10px; flex: 0 0 60px; border: 1px solid #bfe0c0; }
+.slip-none { margin-top: 12px; padding: 10px 12px; background: #fff7e6; border: 2px dashed #f0d089; border-radius: 12px; color: #8a5a00; font-weight: 700; font-size: 16px; text-align: center; }
+
+/* filter chips (shop) */
+.filterbar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 6px; }
+.filterbar::-webkit-scrollbar { display: none; }
+.fchip { flex: 0 0 auto; border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 10px 18px; font-size: 19px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.fchip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+/* menu manage list */
+.mrow { display: flex; align-items: center; gap: 14px; background: #fff; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--line); }
+.mrow.off { opacity: .5; }
+.mrow .mthumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; flex: 0 0 60px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+.mrow .mname { font-size: 21px; font-weight: 600; }
+.mrow .mmeta { color: var(--muted); font-size: 17px; }
+.mrow .mact { margin-left: auto; display: flex; gap: 8px; }
+.toggle { border: none; border-radius: 12px; padding: 12px 16px; font-size: 18px; font-weight: 700; color: #fff; min-width: 96px; }
+.toggle.on { background: var(--ok); }
+.toggle.off { background: #9ca3af; }
+.icon-btn { border: 2px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 14px; font-size: 18px; font-weight: 700; }
+.icon-btn.del { color: var(--danger); border-color: #f3c6c6; }
+
+/* sales */
+.sales-range { display: flex; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }
+.sales-range-btn {
+  padding: 10px 22px; border-radius: 999px; border: 1px solid var(--line);
+  background: #fff; color: var(--muted); font-size: 18px; font-weight: 700; cursor: pointer;
+}
+.sales-range-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.stat { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--line); }
+.stat .label { color: var(--muted); font-size: 18px; }
+.stat .value { font-size: 37px; font-weight: 800; margin-top: 6px; }
+.best-list { background: #fff; border-radius: 16px; padding: 8px 18px; margin-top: 18px; border: 1px solid var(--line); }
+.best-list h3 { margin: 12px 0; }
+.best-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px dashed var(--line); font-size: 20px; }
+
+/* modal (shop forms) */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: #fff; border-radius: 20px; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; }
+.modal h3 { margin: 0; padding: 20px; border-bottom: 1px solid var(--line); font-size: 22px; }
+.modal .mbody { padding: 20px; }
+.modal label { display: block; font-weight: 600; margin: 12px 0 6px; font-size: 17px; }
+.modal input, .modal select { width: 100%; border: 2px solid var(--line); border-radius: 12px; padding: 14px; font-size: 18px; }
+.modal .mfoot { padding: 16px 20px; border-top: 1px solid var(--line); display: flex; gap: 12px; }
+.check-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.check { border: 2px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 16px; font-weight: 600; }
+.check.on { border-color: var(--brand); background: #fff3ea; color: var(--brand-dark); }
+
+/* loading + toast */
+.spinner { width: 34px; height: 34px; border: 4px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; margin: 40px auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-full { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; color: var(--muted); font-size: 18px; }
+.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 100; background: #16a34a; color: #fff; padding: 14px 22px; border-radius: 999px; font-weight: 700; font-size: 18px; box-shadow: 0 6px 20px rgba(0,0,0,.2); animation: slideUp .2s ease; }
+.toast.warn { background: #d97706; }
+.toast.err { background: var(--danger); }
+.alert-banner { background: var(--danger); color: #fff; text-align: center; padding: 12px; font-size: 20px; font-weight: 700; }
+
+/* ---- payment method (customer cart) ---- */
+.paybox { padding: 8px 16px 4px; display: flex; flex-direction: column; gap: 10px; }
+.payopt { display: flex; align-items: flex-start; gap: 12px; text-align: left; width: 100%; background: #fff; border: 2px solid var(--line); border-radius: 14px; padding: 14px; }
+.payopt.active { border-color: var(--brand); background: #fff6ef; }
+.payopt-radio { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #cbb9aa; margin-top: 2px; position: relative; }
+.payopt.active .payopt-radio { border-color: var(--brand); }
+.payopt.active .payopt-radio::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--brand); }
+.payopt-body { display: flex; flex-direction: column; }
+.payopt-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.payopt-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ---- QR pay block (customer) ---- */
+.qr-pay { margin: 4px 16px 0; background: #fff; border: 2px solid var(--brand); border-radius: 16px; padding: 18px; text-align: center; }
+.qr-pay-label { font-weight: 700; color: var(--brand-dark); margin-bottom: 12px; font-size: 16px; }
+.qr-pay-img { width: 100%; max-width: 340px; aspect-ratio: 1; object-fit: contain; border-radius: 12px; background: #fff; }
+.qr-pay-amount { font-size: 22px; font-weight: 800; color: var(--text); margin-top: 12px; }
+.qr-dl-btn { margin-top: 12px; background: #fff; color: var(--text); border: 1.5px solid #e0d6ca; }
+.qr-pay-hint { font-size: 14px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+/* ---- ช่องแนบสลิป (หน้าติดตามออเดอร์ของลูกค้า) ---- */
+.slip-box { margin: 16px 16px 0; background: #fff; border: 2px dashed var(--brand); border-radius: 16px; padding: 18px; text-align: center; }
+.slip-label { font-weight: 700; color: var(--brand-dark); margin-bottom: 8px; font-size: 16px; }
+.slip-hint { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+.slip-thumb { width: 100%; max-width: 240px; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 8px; }
+.slip-ok { color: #15803d; font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.slip-btn { margin-top: 4px; background: var(--brand); color: #fff; border: none; }
+.slip-btn:disabled { opacity: .6; }
+.slip-err { color: var(--danger); font-size: 14px; font-weight: 600; margin-top: 10px; }
+
+/* ---- settings tab (shop) — upload QR ---- */
+.qr-setting-card { background: #fff; border-radius: 18px; border: 1px solid var(--line); padding: 24px; max-width: 460px; text-align: center; }
+.qr-preview { width: 100%; max-width: 300px; aspect-ratio: 1; object-fit: contain; border-radius: 14px; border: 1px solid var(--line); }
+.qr-actions { display: flex; gap: 12px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.qr-empty { color: var(--muted); }
+.qr-empty-icon { font-size: 52px; }
+.qr-empty p { font-size: 16px; line-height: 1.6; margin: 8px 0 18px; }
+.qr-msg { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-weight: 600; font-size: 15px; }
+.qr-msg.ok { background: #e7f6ec; color: #15803d; }
+.qr-msg.err { background: #fdeaea; color: var(--danger); }
+
+/* ---- จัดการหมวดหมู่เมนู (แท็บตั้งค่า) ---- */
+.cat-list { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.cat-edit-card { background: #fff; border: 1px solid #efe6dd; border-radius: 16px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.cat-edit-top { display: flex; align-items: center; gap: 10px; }
+.cat-move { display: flex; flex-direction: column; gap: 3px; }
+.cat-move-btn { width: 30px; height: 22px; border: 1px solid #e6dbd0; background: #faf6f1; border-radius: 7px; font-size: 11px; color: #7a6f66; cursor: pointer; line-height: 1; }
+.cat-move-btn:disabled { opacity: .35; cursor: default; }
+.cat-name-input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid #e6dbd0; border-radius: 10px; font-size: 16px; font-weight: 600; }
+.cat-color-input { width: 44px; height: 44px; padding: 2px; border: 1px solid #e6dbd0; border-radius: 10px; background: #fff; cursor: pointer; flex-shrink: 0; }
+.cat-edit-banner { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.cat-banner-thumb { width: 96px; height: 54px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+.cat-banner-thumb.empty { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; opacity: .8; }
+.cat-edit-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.cat-count { font-size: 14px; color: #8a7f77; margin-right: auto; }
+
+/* ---- ปุ่ม "ออเดอร์ของฉัน" มุมบนขวาของ header ---- */
+.myorders-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 6;
+  background: rgba(255,255,255,.18); color: #fff;
+  border: 1px solid rgba(255,255,255,.5); border-radius: 999px;
+  padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.myorders-btn:active { background: rgba(255,255,255,.3); }
+
+/* ---- ค้นออเดอร์ด้วยเบอร์โทร ---- */
+.hist-search { margin: 14px 12px 4px; background: #fff; border: 1px solid #ece3d9; border-radius: 14px; padding: 14px; }
+.hist-search-label { font-size: 15px; font-weight: 700; color: var(--brand-dark); margin-bottom: 10px; }
+.hist-search-row { display: flex; gap: 8px; }
+.hist-search-row input { flex: 1; min-width: 0; padding: 12px; border: 1px solid #e6dbd0; border-radius: 10px; font-size: 16px; }
+.hist-search-row .btn { flex-shrink: 0; padding: 0 18px; }
+
+/* ---- รายการประวัติออเดอร์ ---- */
+.hist-section { margin: 16px 12px 0; }
+.hist-section-title { font-size: 14px; font-weight: 700; color: #8a7f77; margin: 0 4px 8px; }
+.hist-empty { color: #b3a99f; font-size: 14px; padding: 10px 4px; }
+.hist-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: #fff; border: 1px solid #ece3d9; border-radius: 14px;
+  padding: 12px 14px; margin-bottom: 10px; text-align: left; cursor: pointer;
+}
+.hist-row:active { background: #faf6f1; }
+.hist-main { flex: 1; min-width: 0; }
+.hist-top { display: flex; align-items: center; gap: 8px; }
+.hist-status { font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #fff4ea; color: var(--brand-dark); }
+.hist-status.s-done { background: #e7f6ec; color: #15803d; }
+.hist-status.s-cancelled { background: #fdeaea; color: var(--danger); }
+.hist-status.s-delivering { background: #eaf2fd; color: #2563eb; }
+.hist-date { font-size: 12px; color: #b3a99f; margin-left: auto; }
+.hist-items { font-size: 14px; color: #5c534c; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-bottom { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 13px; color: #8a7f77; }
+.hist-total { font-weight: 700; color: var(--brand-dark); }
+.hist-need-slip { margin-left: auto; font-size: 12px; font-weight: 700; color: #b45309; background: #fff4ea; padding: 2px 8px; border-radius: 999px; }
+.hist-go { font-size: 24px; color: #cbb9aa; flex-shrink: 0; }
+
+/* ---- ปุ่มสั่งเหมือนเดิม ---- */
+.hist-row-wrap { display: flex; flex-direction: column; }
+.hist-reorder {
+  align-self: flex-end; margin: -4px 0 10px; border: 1px solid var(--brand);
+  background: #fff4ea; color: var(--brand-dark); font-weight: 700; font-size: 14px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+}
+.hist-reorder:active { background: #ffe7d3; }
+
+/* ---- หมายเหตุแยกรายแก้ว ---- */
+.item-note {
+  width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  font-family: inherit; font-size: 15px; resize: vertical; color: var(--text);
+}
+.item-note:focus { outline: none; border-color: var(--brand); }
+.ci-note { font-size: 13px; color: #b45309; margin-top: 4px; }
+.oi-note { font-size: 13px; color: #b45309; margin-top: 3px; font-weight: 600; }
+.closed-note { text-align: center; color: var(--danger); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+
+/* ---- แบนเนอร์ร้านปิด (ฝั่งลูกค้า) ---- */
+.shop-closed-banner {
+  margin: 12px 16px 0; background: #fff2f2; border: 1px solid #f6c9c9; color: #b91c1c;
+  border-radius: 14px; padding: 12px 14px; font-weight: 700; text-align: center;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.shop-closed-banner .scb-sub { font-weight: 400; font-size: 13px; color: #8a6a6a; }
+
+/* ---- ช่องค้นหาเมนู ---- */
+.menu-search { position: relative; margin: 12px 16px 0; }
+.menu-search input {
+  width: 100%; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+  padding: 11px 40px 11px 16px; font-family: inherit; font-size: 15px; color: var(--text);
+}
+.menu-search input:focus { outline: none; border-color: var(--brand); }
+.ms-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  border: none; background: #eee; color: #666; width: 26px; height: 26px;
+  border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer;
+}
+
+/* ---- ปุ่มติดต่อร้าน (ฝั่งลูกค้า) ---- */
+.contact-row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+.contact-btn {
+  display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+  background: rgba(255,255,255,.25); color: #fff; font-weight: 700; font-size: 14px;
+  padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.5);
+}
+.contact-btn.line { background: #06c755; border-color: #06c755; }
+.contact-btn:active { opacity: .85; }
+
+/* ---- การ์ดสถานะร้าน (ฝั่งแอดมิน) ---- */
+.shop-state-pill {
+  display: inline-block; font-weight: 700; font-size: 15px; padding: 8px 14px;
+  border-radius: 999px; margin-bottom: 14px;
+}
+.shop-state-pill.open { background: #eafaef; color: #16a34a; }
+.shop-state-pill.closed { background: #fff2f2; color: #b91c1c; }
+.set-toggle { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 15px; cursor: pointer; }
+.set-toggle input { width: 20px; height: 20px; accent-color: var(--brand); }
+.set-hours { display: flex; gap: 12px; }
+.set-hours .field { flex: 1; }
+
+/* ---- ช่องส่งลิงก์/ข้อความถึงลูกค้า (ฝั่งแม่ ในการ์ดออเดอร์) ---- */
+.send-msg { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.send-msg-toggle {
+  width: 100%; border: 1.5px dashed #b7d9c4; background: #f3fbf6; color: #16a34a;
+  font-weight: 700; font-size: 15px; border-radius: 12px; padding: 12px;
+}
+.send-msg-toggle:active { opacity: .85; }
+.send-msg-label { font-size: 14px; font-weight: 700; color: #6f665f; margin-bottom: 6px; }
+.send-msg-input {
+  width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px;
+  font-size: 16px; font-family: inherit; resize: vertical; background: #fff;
+}
+.send-msg-input:focus { outline: none; border-color: #16a34a; }
+.send-msg-actions { display: flex; gap: 8px; margin-top: 8px; }
+.send-msg-btn {
+  flex: 1; border: none; background: #16a34a; color: #fff; font-weight: 700;
+  font-size: 15px; border-radius: 12px; padding: 12px;
+}
+.send-msg-btn:disabled { background: #cfe6d8; }
+.send-msg-clear {
+  border: 1.5px solid var(--line); background: #fff; color: var(--danger);
+  font-weight: 700; font-size: 15px; border-radius: 12px; padding: 12px 16px;
+}
+.send-msg-ok { font-size: 13px; color: #16a34a; font-weight: 700; margin-top: 6px; }
+
+/* ---- กล่องข้อความจากร้าน (ฝั่งลูกค้า ในหน้าติดตาม) ---- */
+.shop-msg-box {
+  text-align: left; margin: 18px auto 0; max-width: 380px;
+  background: #f3fbf6; border: 1.5px solid #b7d9c4; border-radius: 14px; padding: 14px 16px;
+}
+.shop-msg-title { font-size: 14px; font-weight: 700; color: #16a34a; margin-bottom: 6px; }
+.shop-msg-body { font-size: 16px; color: var(--text); line-height: 1.55; word-break: break-word; white-space: pre-wrap; }
+.shop-msg-body a { color: #0f8a3c; font-weight: 700; text-decoration: underline; }

@@ -1,0 +1,25 @@
+node_modules
+dist
+dist_check
+.env
+.env.local
+.DS_Store
+*.log
+.vercel
+
+# raw menu photos uploaded at project root (banners live in public/menu/)
+/*.PNG
+/*.JPEG
+/*.JPG
+/*.png
+/*.jpeg
+
+# vite temp build files
+vite.config.js.timestamp-*.mjs
+
+# build output folders + packaged zips (drag-drop deploy artifacts)
+dist_*
+*.zip
+
+# stray netlify drop temp files at project root
+/zi*
